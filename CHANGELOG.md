@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.5] — 2026-11-24
+
+### Fixed
+- **Pesan pre-flight config menampilkan nama var env yang salah.** Saat sumbernya env, baris diagnosis mencetak nama konstanta `STRIX_WEB_SEARCH_PROVIDER` padahal var yang ketemu bisa `WEB_SEARCH_PROVIDER` (tanpa prefix) — membingungkan karena baris perbaikannya (`unset …`) memakai nama yang benar. Kini kedua baris memakai nama var yang sebenarnya ditemukan. (Ditemukan dari run live Fahmi: sumbernya ternyata env shell `WEB_SEARCH_PROVIDER='custom'` — jebakan v1.13.4 terkonfirmasi.)
+
 ## [1.13.4] — 2026-11-24
 
 ### Fixed
