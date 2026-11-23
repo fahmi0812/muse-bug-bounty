@@ -1,4 +1,4 @@
-// tests/patterns-cited.test.js — pola BERSITASI P0-2 + v1.9 (112 pola, 21 skill).
+// tests/patterns-cited.test.js — pola BERSITASI P0-2 + v1.9 (124 pola, 21 skill).
 // Aturan: tiap pola bersitasi wajib punya h1_report_id + link
 // https://hackerone.com/reports/<id> yang cocok dengan ID-nya; pola
 // uncited wajib tanpa link; tidak boleh ada (skill, h1_report_id) ganda.
@@ -13,28 +13,28 @@ const EXPECTED_CITED_PER_SKILL = {
   "hunt-graphql": 6,
   "hunt-business-logic": 6,
   "hunt-oauth": 5,
-  "hunt-csrf": 5,
-  "hunt-rce": 5,
+  "hunt-csrf": 7,
+  "hunt-rce": 8,
   "hunt-race-condition": 5,
   "hunt-file-upload": 5,
   "hunt-lfi": 5,
   "hunt-forgot-password": 5,
   "hunt-saml": 5,
-  "hunt-sqli": 4,
-  "hunt-ssti": 4,
+  "hunt-sqli": 7,
+  "hunt-ssti": 6,
   "hunt-idor": 6,
   "hunt-dom": 6,
   "hunt-jwt-crypto": 5,
   "hunt-mfa-bypass": 5,
   "hunt-cache-poison": 5,
   "hunt-http-smuggling": 8,
-  "hunt-auth-bypass": 4,
+  "hunt-auth-bypass": 6,
 };
 
-test("cited: 112 pola bersitasi dari 21 skill, semuanya lolos validatePattern", () => {
+test("cited: 124 pola bersitasi dari 21 skill, semuanya lolos validatePattern", () => {
   const list = loadPatterns();
   const cited = citedPatterns(list);
-  assert.equal(cited.length, 112);
+  assert.equal(cited.length, 124);
   for (const p of cited) assert.equal(validatePattern(p), true);
   const perSkill = {};
   for (const p of cited) perSkill[p.skill] = (perSkill[p.skill] ?? 0) + 1;
@@ -72,17 +72,17 @@ test("cited: patternEvidence menghitung bukti bersitasi per skill", () => {
   const list = loadPatterns();
   // hunt-ato: 1 seed uncited + 7 bersitasi -> router bonus penuh (3+ pola).
   assert.deepEqual(patternEvidence("hunt-ato", "", list), { skill: "hunt-ato", vulnClass: "", cited: 7, uncited: 1, total: 8 });
-  assert.deepEqual(patternEvidence("hunt-ssti", "", list), { skill: "hunt-ssti", vulnClass: "", cited: 4, uncited: 0, total: 4 });
+  assert.deepEqual(patternEvidence("hunt-ssti", "", list), { skill: "hunt-ssti", vulnClass: "", cited: 6, uncited: 0, total: 6 });
   // Skill tanpa pola bersitasi tetap 0 bukti (mis. hunt-xss hanya seed).
   assert.deepEqual(patternEvidence("hunt-xss", "", list), { skill: "hunt-xss", vulnClass: "", cited: 0, uncited: 1, total: 1 });
 });
 
-test("cited: payout hanya ada bila tahun terverifikasi (7 laporan dicek live)", () => {
+test("cited: payout hanya ada bila tahun terverifikasi (12 laporan dicek live)", () => {
   const list = loadPatterns();
   const withPayout = list.filter((p) => p.payout != null);
   assert.deepEqual(
     withPayout.map((p) => [p.h1_report_id, p.tahun, p.payout]),
-    [["826361", 2020, 10000], ["745324", 2019, 20000], ["383127", 2018, 25000], ["925585", 2020, 30000], ["827052", 2020, 20000], ["3800870", 2026, 1337], ["488147", 2019, 18900]]
+    [["826361", 2020, 10000], ["745324", 2019, 20000], ["383127", 2018, 25000], ["925585", 2020, 30000], ["827052", 2020, 20000], ["3800870", 2026, 1337], ["488147", 2019, 18900], ["476150", 2019, 2500], ["838855", 2020, 2000], ["206872", 2017, 2500], ["658013", 2019, 12000], ["181879", 2016, 18000]]
   );
   for (const p of list) {
     if (p.payout != null) assert.notEqual(p.tahun, null);

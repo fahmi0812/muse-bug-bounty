@@ -7,10 +7,10 @@ import { loadPatterns, validatePattern, patternsForSkill, patternEvidence } from
 
 const REQUIRED = ['skill', 'subclass', 'cwe', 'cve', 'h1_report_id', 'tahun', 'payout', 'uncited', 'link'];
 
-test('patterns: file dimuat, 124 pola (12 seed uncited + 112 bersitasi P0-2/v1.9)', () => {
+test('patterns: file dimuat, 136 pola (12 seed uncited + 124 bersitasi P0-2/v1.9/batch-1B)', () => {
   const list = loadPatterns();
-  assert.equal(list.length, 124);
-  assert.equal(list.filter((p) => p.uncited === false).length, 112);
+  assert.equal(list.length, 136);
+  assert.equal(list.filter((p) => p.uncited === false).length, 124);
   assert.equal(list.filter((p) => p.uncited === true).length, 12);
   const skills = new Set(list.map((p) => p.skill));
   for (const s of ['hunt-oauth', 'hunt-ato', 'hunt-session', 'hunt-forgot-password', 'hunt-saml', 'hunt-cors', 'hunt-cache-poison', 'hunt-websocket', 'hunt-sqli', 'hunt-xss', 'hunt-idor', 'hunt-ssrf']) {

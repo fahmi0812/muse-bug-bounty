@@ -46,7 +46,7 @@ test("v1.10 CLI: bounty skills --skill tampilkan isi + skill tak dikenal exit 2"
 test("v1.10 CLI: bounty patterns total 124, bersitasi 112", () => {
   const r = runCli(["patterns"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /124 total, 112 bersitasi/);
+  assert.match(r.stdout, /136 total, 124 bersitasi/);
   const r2 = runCli(["patterns", "--skill", "hunt-http-smuggling"]);
   assert.equal(r2.status, 0, r2.stderr);
   assert.match(r2.stdout, /8 bersitasi/);

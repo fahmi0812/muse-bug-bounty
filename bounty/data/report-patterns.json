@@ -1486,5 +1486,137 @@
     "tahun": null,
     "uncited": false,
     "vuln_class": "Authentication Bypass"
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-94",
+    "h1_report_id": "423541",
+    "link": "https://hackerone.com/reports/423541",
+    "payout": null,
+    "skill": "hunt-ssti",
+    "subclass": "SSTI in merchant-editable workflow email templates (Shopify Return Magic)",
+    "tahun": null,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-94",
+    "h1_report_id": "1104349",
+    "link": "https://hackerone.com/reports/1104349",
+    "payout": null,
+    "skill": "hunt-ssti",
+    "subclass": "SSTI via signup name field rendered in welcome email (Glovo)",
+    "tahun": null,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-287",
+    "h1_report_id": "219205",
+    "link": "https://hackerone.com/reports/219205",
+    "payout": null,
+    "skill": "hunt-auth-bypass",
+    "subclass": "Subdomain takeover → shared SSO session cookie theft → auth bypass (Uber)",
+    "tahun": null,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-287",
+    "h1_report_id": "3564655",
+    "link": "https://hackerone.com/reports/3564655",
+    "payout": null,
+    "skill": "hunt-auth-bypass",
+    "subclass": "NoSQL operator in access_token matches first OAuth token → admin bypass (Rocket.Chat)",
+    "tahun": 2026,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-89",
+    "h1_report_id": "476150",
+    "link": "https://hackerone.com/reports/476150",
+    "payout": 2500,
+    "skill": "hunt-sqli",
+    "subclass": "SQLi on a vendor microsite exposing sensitive data (Uber)",
+    "tahun": 2019,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-89",
+    "h1_report_id": "838855",
+    "link": "https://hackerone.com/reports/838855",
+    "payout": 2000,
+    "skill": "hunt-sqli",
+    "subclass": "Blind SQL injection in a banner endpoint (Zomato)",
+    "tahun": 2020,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-89",
+    "h1_report_id": "206872",
+    "link": "https://hackerone.com/reports/206872",
+    "payout": 2500,
+    "skill": "hunt-sqli",
+    "subclass": "SQLi in third-party threat-intel software (Anomali, Uber)",
+    "tahun": 2017,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-78",
+    "h1_report_id": "591295",
+    "link": "https://hackerone.com/reports/591295",
+    "payout": null,
+    "skill": "hunt-rce",
+    "subclass": "Pre-auth RCE chain in SSL VPN appliance (X/Twitter)",
+    "tahun": null,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-78",
+    "h1_report_id": "658013",
+    "link": "https://hackerone.com/reports/658013",
+    "payout": 12000,
+    "skill": "hunt-rce",
+    "subclass": "Git flag injection → local file overwrite → RCE (GitLab)",
+    "tahun": 2019,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-94",
+    "h1_report_id": "181879",
+    "link": "https://hackerone.com/reports/181879",
+    "payout": 18000,
+    "skill": "hunt-rce",
+    "subclass": "Struct type confusion in mruby scripting engine → RCE (Shopify Scripts)",
+    "tahun": 2016,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-352",
+    "h1_report_id": "807924",
+    "link": "https://hackerone.com/reports/807924",
+    "payout": null,
+    "skill": "hunt-csrf",
+    "subclass": "CSRF on payment-provider linking via fixed predictable token (Shopify PayPal)",
+    "tahun": null,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-352",
+    "h1_report_id": "47472",
+    "link": "https://hackerone.com/reports/47472",
+    "payout": null,
+    "skill": "hunt-csrf",
+    "subclass": "CSRF token leaked cross-origin via data-method link handler (HackerOne)",
+    "tahun": 2015,
+    "uncited": false
   }
 ]
