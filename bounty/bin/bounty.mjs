@@ -17,7 +17,8 @@ import { detectModels, saveProvider, writeStrixConfig, NINE_ROUTER_BASE } from "
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
-import { checkFailOn } from "../lib/failon.js";
+import { checkFailOn, severityFor } from "../lib/failon.js";
+import { color, table, summaryBox, formatUsd, progressBar, severityBadge } from "../lib/ui.js";
 import { searchCode } from "../lib/codesearch.js";
 import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
 import { budgetStatus } from "../lib/cost.js";
@@ -43,7 +44,7 @@ import { decideGraphUpgrade } from "../lib/graph-gate.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
-export const VERSION = "1.7.0";
+export const VERSION = "1.8.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -152,6 +153,8 @@ Penggunaan:
 
 Aturan keras: scope-gate, budget, tanpa submit/bayar/deposit, tanpa API berbayar
 tanpa persetujuan. Kredensial asli JANGAN ditaruh di repo — pakai env/provider.
+Tampilan: warna otomatis mati bila output di-pipe atau NO_COLOR diset
+(BOUNTY_NO_COLOR=1 juga bisa).
 `;
 
 function parseArgs(argv) {
@@ -259,7 +262,7 @@ async function runSingleTarget(args, targetOverride = null) {
 
   // 1. Scope gate
   const scope = checkScope(program, target);
-  console.log(scope.ok ? "Scope OK" : `Scope DITOLAK: ${scope.reason}`);
+  console.log(scope.ok ? color("Scope OK", "green") : color(`Scope DITOLAK: ${scope.reason}`, "red"));
   if (!scope.ok) {
     try { logAudit({ command: "run", target, program: program.name, result: "blocked" }); } catch {}
     return 2;
@@ -395,7 +398,14 @@ async function runSingleTarget(args, targetOverride = null) {
       const bs = budgetStatus({ spent: usd, budget });
       if (bs.exceeded) console.log(`Peringatan: biaya $${usd} sudah MELEBIHI budget $${budget} untuk target ini.`);
       else if (bs.warn) console.log(`Peringatan: biaya $${usd} sudah ${Math.round(bs.pct * 100)}% dari budget $${budget}.`);
-      console.log(`\nHasil parse: ${findings.length} temuan dari output Strix, ${added} kandidat baru masuk store (dedup: ${findings.length - added} duplikat). Biaya terukur: $${usd}.`);
+      console.log("");
+      console.log(summaryBox([
+        `Target: ${target}`,
+        `Temuan dari Strix: ${findings.length}`,
+        `${added} kandidat baru masuk store (duplikat: ${findings.length - added})`,
+        `Biaya: ${formatUsd(usd)} dari budget ${formatUsd(budget)}`,
+        added > 0 ? "Status: ada kandidat baru — review dulu sebelum dipakai" : "Status: tidak ada kandidat baru",
+      ], { title: "Ringkasan run" }));
       console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
       // v1.2 memori: episode per run + coverage kelas yang diperiksa +
       // peringatan bila pola serupa pernah ditolak (FP) oleh reviewer.
@@ -460,9 +470,14 @@ async function cmdRun(args) {
       return { status: r.code === 0 ? "ok" : "failed", usd: r.usd, findings: r.findings };
     }, {
       budget,
-      onProgress: (p) => console.log(`[${p.done}/${p.total}] ${p.target}: ${p.status}, $${p.usd} (total $${p.totalUsd})`),
+      onProgress: (p) => console.log(`${progressBar(p.done, p.total)} ${p.target}: ${p.status}, ${formatUsd(p.usd)} (total ${formatUsd(p.totalUsd)})`),
     });
     console.log(`Antrean selesai: ${summary.done}/${summary.total} target, total biaya $${summary.totalUsd}${summary.stopped ? " (berhenti: budget habis)" : ""}.`);
+    console.log(summaryBox([
+      `Target selesai: ${summary.done}/${summary.total}`,
+      `Total biaya: ${formatUsd(summary.totalUsd)} dari budget ${formatUsd(budget)}`,
+      summary.stopped ? "Berhenti: budget habis — pakai --pause untuk jeda" : "Semua target selesai",
+    ], { title: "Ringkasan antrean" }));
     if (summary.stopped && args.pause) {
       const remaining = targets.slice(summary.done);
       const pauseFile = join(process.cwd(), ".bounty", `pause-${Date.now()}.json`);
@@ -500,14 +515,14 @@ function cmdReview(args) {
   try {
     if (args.approve) {
       const row = store.approveCandidate(Number(args.approve));
-      console.log(row ? `Kandidat #${row.id} disetujui (approved).` : `Kandidat #${args.approve} tidak ditemukan.`);
+      console.log(row ? color(`Kandidat #${row.id} disetujui (approved).`, "green") : color(`Kandidat #${args.approve} tidak ditemukan.`, "red"));
       auditLog(row ? "ok" : "error", `#${args.approve}`);
       if (row) { try { addLesson(store.db, { skill: expectedSkillFor(row.vuln_class), vulnClass: row.vuln_class, outcome: "confirmed", note: `review approve #${row.id}` }); recordEpisode(store.db, { program: row.program, target: row.endpoint, kind: "review", summary: `approve #${row.id} ${row.vuln_class}` }); } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); } }
       return row ? 0 : 2;
     }
     if (args.reject) {
       const row = store.rejectCandidate(Number(args.reject));
-      console.log(row ? `Kandidat #${row.id} ditolak (rejected).` : `Kandidat #${args.reject} tidak ditemukan.`);
+      console.log(row ? color(`Kandidat #${row.id} ditolak (rejected).`, "yellow") : color(`Kandidat #${args.reject} tidak ditemukan.`, "red"));
       auditLog(row ? "ok" : "error", `#${args.reject}`);
       if (row) { try { addLesson(store.db, { skill: expectedSkillFor(row.vuln_class), vulnClass: row.vuln_class, outcome: "false_positive", note: `review reject #${row.id}` }); recordEpisode(store.db, { program: row.program, target: row.endpoint, kind: "review", summary: `reject #${row.id} ${row.vuln_class} (FP)` }); } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); } }
       return row ? 0 : 2;
@@ -530,9 +545,9 @@ function cmdReview(args) {
       return 0;
     }
     console.log("Antrean review (status candidate):");
-    for (const c of list) {
-      console.log(`  #${c.id} [${c.program}] ${c.method} ${c.endpoint} param=${c.param || "-"} kelas=${c.vuln_class} cwe=${c.cwe || "-"}`);
-    }
+    const queueRows = list.map((c) => [`#${c.id}`, c.program, c.method, c.endpoint, c.param || "-", `${severityBadge(severityFor(c))} ${c.vuln_class}`, c.cwe || "-"]);
+    console.log(table(queueRows, ["ID", "Program", "Method", "Endpoint", "Param", "Kelas", "CWE"]));
+    console.log(`Total: ${list.length} kandidat menunggu review.`);
     console.log("Gunakan: bounty review --approve <id> | --reject <id>");
     console.log("Halaman HTML: bounty review --export-html [file]");
     auditLog("ok");
@@ -549,12 +564,14 @@ function cmdPrograms() {
   try { files = readdirSync(dir).filter((f) => f.endsWith(".md")).sort(); } catch { console.error("Folder programs/ tidak ditemukan."); return 2; }
   if (files.length === 0) { console.log("Tidak ada program di programs/."); return 0; }
   console.log("Program:");
+  const rows = [];
   for (const f of files) {
     try {
       const prog = loadProgramFile(join(dir, f));
-      console.log(`  ${prog.name || f.replace(/\.md$/, "")} — scope: ${prog.allowedHosts.join(", ") || "-"} | budget: $${prog.maxBudgetUsd ?? 5} | rate: ${prog.rateLimit}/detik | roles: ${prog.roles.join(", ")}`);
-    } catch (e) { console.log(`  ${f} — (gagal dibaca: ${e.message})`); }
+      rows.push([prog.name || f.replace(/\.md$/, ""), prog.allowedHosts.join(", ") || "-", formatUsd(prog.maxBudgetUsd ?? 5), `${prog.rateLimit}/detik`, prog.roles.join(", ")]);
+    } catch (e) { rows.push([f, "(gagal dibaca)", "-", "-", "-"]); }
   }
+  console.log(table(rows, ["Program", "Scope", "Budget", "Rate", "Roles"]));
   return 0;
 }
 
@@ -578,7 +595,9 @@ function cmdFindings(args) {
     const rows = [...candidates.map((c) => ({ ...c, status: "candidate" })), ...approved.map((c) => ({ ...c, status: "approved" }))];
     if (rows.length === 0) { console.log(program ? `Tidak ada temuan untuk program ${program}.` : "Tidak ada temuan tersimpan."); return 0; }
     console.log("Temuan tersimpan:");
-    for (const c of rows) console.log(`  #${c.id} [${c.status}] [${c.program}] ${c.method} ${c.endpoint} param=${c.param || "-"} kelas=${c.vuln_class} cwe=${c.cwe || "-"}`);
+    const tableRows = rows.map((c) => [`#${c.id}`, c.status, c.program, c.method, c.endpoint, c.param || "-", `${severityBadge(severityFor(c))} ${c.vuln_class}`, c.cwe || "-"]);
+    console.log(table(tableRows, ["ID", "Status", "Program", "Method", "Endpoint", "Param", "Kelas", "CWE"]));
+    console.log(`Total: ${rows.length} temuan (${candidates.length} kandidat, ${approved.length} disetujui).`);
     return 0;
   } finally { store.close(); }
 }

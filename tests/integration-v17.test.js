@@ -15,9 +15,9 @@ function runBounty(args, env = {}) {
   });
 }
 
-test("v1.7.0: --version + firmware tanpa tool -> exit 2 (tool tidak dikenal) / skipped", () => {
+test("v1.8.0: --version + firmware tanpa tool -> exit 2 (tool tidak dikenal) / skipped", () => {
   const v = runBounty(["--version"]);
-  assert.match(v.stdout, /bounty v1\.7\.0/);
+  assert.match(v.stdout, /bounty v1\.8\.0/);
   const bad = runBounty(["firmware", "--tool", "tidak-ada", "--file", "x.bin"]);
   assert.equal(bad.status, 2);
   const noFile = runBounty(["firmware", "--tool", "binwalk-ng"]);

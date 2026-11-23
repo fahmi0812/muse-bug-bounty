@@ -4,6 +4,14 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.8.0] — 2026-11-23
+
+### Added
+- **v1.8 — CLI dibagusin + lebih mudah dipahami:**
+  - **`bounty/lib/ui.js` (baru, zero-dep):** `colorsEnabled` (mati bila `NO_COLOR` / `BOUNTY_NO_COLOR=1` / output di-pipe — log tetap bersih), `color` (red/green/yellow/cyan/dim/bold ANSI), `severityColor` + `severityBadge` (label Indonesia `[KRITIS]`/`[TINGGI]`/`[SEDANG]`/`[RENDAH]`/`[INFO]`), `table` (kolom rata kiri), `progressBar` (`[████░░] n/N`), `summaryBox` (kotak ringkasan `┌┐└┘│─`), `phaseLine` (`▸ Fase: detail`), `formatUsd` (`$5.00`). 15 test.
+  - **Disambung ke CLI:** `bounty run` — Scope OK/DITOLAK berwarna + kotak "Ringkasan run" (temuan, kandidat baru masuk store, duplikat, biaya vs budget, status); `bounty run --targets` — progress bar per target + kotak "Ringkasan antrean"; `bounty programs` / `bounty findings` / `bounty review` — tabel sejajar + badge severity + baris total; approve hijau, reject kuning, tidak ditemukan merah. Semua teks lama dipertahankan sebagai substring (tes lama tetap hijau; warna mati total bila non-TTY).
+- **Batasan jujur v1.8.0:** tampilan baru belum pernah dilihat di terminal sungguhan (hanya output pipe di VM — warna aktif hanya di TTY); tidak ada perubahan perilaku hunt/scope/budget/store — hanya tampilan.
+
 ## [1.7.0] — 2026-11-23
 
 ### Added
