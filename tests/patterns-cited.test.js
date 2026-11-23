@@ -77,12 +77,12 @@ test("cited: patternEvidence menghitung bukti bersitasi per skill", () => {
   assert.deepEqual(patternEvidence("hunt-xss", "", list), { skill: "hunt-xss", vulnClass: "", cited: 0, uncited: 1, total: 1 });
 });
 
-test("cited: payout hanya ada bila tahun terverifikasi (2 laporan dicek live)", () => {
+test("cited: payout hanya ada bila tahun terverifikasi (7 laporan dicek live)", () => {
   const list = loadPatterns();
   const withPayout = list.filter((p) => p.payout != null);
   assert.deepEqual(
     withPayout.map((p) => [p.h1_report_id, p.tahun, p.payout]),
-    [["745324", 2019, 20000], ["925585", 2020, 30000]]
+    [["826361", 2020, 10000], ["745324", 2019, 20000], ["383127", 2018, 25000], ["925585", 2020, 30000], ["827052", 2020, 20000], ["3800870", 2026, 1337], ["488147", 2019, 18900]]
   );
   for (const p of list) {
     if (p.payout != null) assert.notEqual(p.tahun, null);
