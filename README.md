@@ -6,9 +6,10 @@
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
 > (Docker/Strix/provider/PowerShell) dan ditulis jujur di sana.
 
-> **v1.12.0 — perbaikan kecil (2026-11-23):** router accuracy mock 100%
-> semua lab (skill baru hunt-dos, 8 pemetaan kelas, pengayaan keyword),
-> promosi penuh track-record, recon otomatis daftarkan surface ke planner.
+> **Setup terpandu (baru di main, 2026-11-23):** satu perintah `bounty setup`
+> menuntun prasyarat → provider → target & scope → verifikasi (Scope OK),
+> lalu `bounty run` tanpa argumen tinggal pilih program. Detail di
+> [Quickstart](#quickstart).
 
 > **v1.11.0 — ingatan belajar (2026-11-23):** `bounty/lib/learning.js` —
 > track record presisi per skill dari verdict reviewer (router naik/turun
@@ -41,10 +42,10 @@ tanpa pembayaran, tanpa deposit.
 | Mode | Cara pakai | Provider |
 | --- | --- | --- |
 | **1 — Muse skill** | Instal skill `skills/bounty/` ke Muse; agen memakai Strix lewat `--skills-dir` | Tanpa provider — pakai model Muse yang sedang berjalan |
-| **2 — Standalone CLI** | `bounty run --target ... --program ...` | Provider picker ala Lumitome (OpenAI / Anthropic / dst, pilih saat setup pertama) |
+| **2 — Standalone CLI** | `bounty setup` sekali, lalu `bounty run` | Provider picker ala Lumitome (OpenAI / Anthropic / 9router lokal, pilih saat setup pertama) |
 
 Mode 1 tidak butuh API key apa pun. Mode 2 butuh key provider yang user
-pasang sendiri sekali di awal (`bounty install` → wizard provider);
+pasang sendiri sekali di awal (`bounty setup` → langkah provider);
 key disimpan lokal dengan mode file `0600`, tidak pernah di-commit.
 
 ## Install
@@ -102,15 +103,35 @@ Lalu instal Strix (bukan bagian repo ini):
 curl -sSL https://strix.ai/install | bash
 ```
 
-Dan, hanya untuk Mode 2, jalankan wizard provider sekali:
+Dan, hanya untuk Mode 2, jalankan setup terpandu sekali (provider +
+target + scope + verifikasi, tinggal pilih-pilih):
 
 ```bash
-bounty install
+bounty setup
 ```
+
+`bounty setup` menuntun 4 langkah: (1) cek prasyarat (Node/Strix),
+(2) provider — tipe, base URL (default 9router lokal
+`http://127.0.0.1:20128/v1`), API key (tidak di-echo), deteksi + filter +
+pilih model, (3) target — host + template scope (seluruh situs / API
+saja / custom) + Budget/Rate/Roles (semua ada default), disimpan ke
+`programs/<nama>.md` (program yang sudah ada bisa dipilih, tidak perlu
+dibuat ulang), (4) verifikasi scope in-process (harus Scope OK).
+Non-interaktif: `bounty setup --yes --api-key KEY --model ID --host
+staging.contoh.com [--template all|api|custom]`; `--skip-provider`
+memakai provider tersimpan. Wizard lama `bounty provider` tetap ada
+untuk mengubah provider saja.
 
 ## Quickstart
 
 ```bash
+# Setup terpandu sekali — provider + target + scope + verifikasi
+bounty setup
+
+# Lalu jalan, tinggal pilih program (tanpa argumen, di terminal)
+bounty run
+
+# Atau eksplisit seperti dulu:
 # Kering dulu — tidak ada request keluar, tidak ada temuan dikirim
 bounty run --target https://example.com/api/users --program programs/example.md --dry-run
 
@@ -133,7 +154,7 @@ muse-bug-bounty/
 ├── bounty/
 │   ├── bin/bounty.mjs      # CLI entrypoint
 │   └── lib/                # router, dedup, rate, scope, guard,
-│                           # provider, store (SQLite bounty.db), auth, bench
+│                           # provider, setup wizard, store (SQLite bounty.db), auth, bench
 ├── skills/bounty/          # Muse skill (Mode 1)
 ├── programs/               # definisi scope program (.md: example, juice-shop, dvwa, vampi, dvga, llm-app)
 ├── eval/
@@ -204,8 +225,10 @@ tidak turun dibanding baseline Strix. Detail di
 - **Docker/Strix belum diuji live di VM ini**: lab eval jalan mode
   no-docker (mock findings deterministik); `docker compose` lab dan
   Strix asli belum dijalankan di sini.
-- **Provider picker belum diuji live**: belum ada panggilan API
-  berbayar / `GET /models` ke provider nyata dari repo ini.
+- **Provider picker sudah diuji live ke 9router lokal** (23 Nov 2026):
+  `bounty provider` mendeteksi **212 model** via `GET /models` di
+  `http://127.0.0.1:20128/v1` dan menyimpan provider + Strix config.
+  Provider berbayar (OpenAI/Anthropic) belum diuji live dari repo ini.
 - **PowerShell installer (`scripts/install.ps1`) belum diuji live**
   di Windows.
 - **Baseline belum pernah diukur live**: `eval/results/baseline.json` belum ada — ukur di laptop: `npm run measure-baseline` (butuh Docker + Strix). Sampai itu jalan, klaim TP/FP vs baseline belum terbukti.

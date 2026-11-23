@@ -49,7 +49,13 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+### Added
+- **`bounty setup` — wizard terpandu satu alur (berwarna di terminal).** Satu perintah menuntun: (1) cek prasyarat (Node/Strix), (2) provider → tipe/base-url/API key (input tidak di-echo) → deteksi + filter + pilih model, (3) target → host + template scope (seluruh situs / API saja / custom) + Budget/Rate/Roles (semua ada default), simpan ke `programs/<nama>.md`, (4) verifikasi scope in-process. Folder `programs/` dibuat otomatis; provider tersimpan tetap `0600` & tak pernah dilog. Warna nyala otomatis di TTY, mati saat di-pipe/`NO_COLOR`. Non-TTY tidak menggantung: minta `--yes` + flag atau keluar dengan panduan. Logika murni dipisah ke `bounty/lib/setup.js` (round-trip ke `parseProgram`, target verifikasi dijamin in-scope) — 11 test.
+- **`bounty run` tanpa argumen (di terminal)** menampilkan daftar program tersimpan untuk dipilih nomor, lalu konfirmasi target (default = contoh in-scope). Non-TTY tetap memakai perilaku lama (tidak menggantung).
+- **`ui.js`:** helper `heading` (tebal) + `hint` (redup) untuk wizard.
+
 ### Fixed
+- **`summaryBox` tidak sejajar saat isi berwarna.** Sama seperti `table()`, lebar kotak dihitung dari panjang mentah termasuk kode ANSI sehingga garis tepi kanan bergeser bila isi diwarnai (dipakai kotak ringkasan `setup`/`run`). Lebar kini dari panjang tampak.
 - **CLI UI/UX polish (hanya tampilan, perilaku hunt/scope/budget/store tidak berubah):**
   - **Warning SQLite tidak lagi bocor:** `ExperimentalWarning` dari `node:sqlite` disaring di `bounty/bin/bounty.mjs` sehingga perintah baca sederhana (`--version`, `findings`, `review`, `programs`) tidak lagi mengotori stderr/CI; warning lain tetap dicetak apa adanya.
   - **Teks `--help` dirapikan:** deskripsi yang salah tempat diperbaiki (penjelasan `run` tadinya muncul di bawah `view`; penjelasan `review` di bawah `trace`) dan perintah dikelompokkan per seksi (Setup, Alur inti, Recon & scan, dll.) agar mudah dipindai.
