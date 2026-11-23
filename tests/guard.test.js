@@ -37,15 +37,17 @@ test('guard: strix --target diizinkan', () => {
   assert.equal(checkCommand('strix --version').allowed, true);
 });
 
-test('guard: skills-dir di folder instal tool diizinkan dari cwd mana saja', () => {
-  // Kasus nyata: pengguna jalan dari ~/Downloads/UNF/cy1/degre, skills-dir
-  // ada di folder instal bounty (/home/fahmi/muse-bug-bounty/skills/bounty).
-  // Tanpa allowRoots perintah ini diblokir ("keluar dari workspace");
-  // dengan allowRoots = folder instal, perintah sah ini lolos.
-  const cmd = 'strix --target https://staging.degreeliquidityprovider.com/ --budget 100 --max-budget-usd 100 --max-turns 40 --skills-dir /home/fahmi/muse-bug-bounty/skills/bounty';
-  assert.equal(checkCommand(cmd, '/home/fahmi/Downloads/UNF/cy1/degre').allowed, false);
-  assert.equal(checkCommand(cmd, '/home/fahmi/Downloads/UNF/cy1/degre', { allowRoots: ['/home/fahmi/muse-bug-bounty'] }).allowed, true);
-  // allowRoots tidak melemahkan aturan lain: path rahasia / pola terlarang tetap diblokir.
+test('guard: perintah run Strix dari cwd mana saja diizinkan; allowRoots hanya untuk path milik tool', () => {
+  // Perintah run nyata (v1.13.2): tanpa path absolut — lolos dari cwd mana
+  // pun, tanpa allowRoots. Flag --budget/--skills-dir sudah dihapus karena
+  // tidak dikenal Strix terinstal; skill lewat env STRIX_SKILLS_DIR.
+  const cmd = 'strix --target https://staging.degreeliquidityprovider.com/ --max-budget 100 --max-turns 500';
+  assert.equal(checkCommand(cmd, '/home/fahmi/Downloads/UNF/cy1/degre').allowed, true);
+  // allowRoots (guard-level): path di dalam folder instal tool diizinkan,
+  // tanpa allowRoots tetap diblokir; aturan lain tidak melemah.
+  const readSkill = 'cat /home/fahmi/muse-bug-bounty/skills/bounty/skills-index.json';
+  assert.equal(checkCommand(readSkill, '/home/fahmi/Downloads/UNF/cy1/degre').allowed, false);
+  assert.equal(checkCommand(readSkill, '/home/fahmi/Downloads/UNF/cy1/degre', { allowRoots: ['/home/fahmi/muse-bug-bounty'] }).allowed, true);
   assert.equal(checkCommand('cat /home/fahmi/.ssh/id_rsa', '/home/fahmi/Downloads/UNF/cy1/degre', { allowRoots: ['/home/fahmi/muse-bug-bounty'] }).allowed, false);
   assert.equal(checkCommand('strix --target https://example.com; rm -rf /', '/home/fahmi/Downloads/UNF/cy1/degre', { allowRoots: ['/home/fahmi/muse-bug-bounty'] }).allowed, false);
   assert.equal(checkCommand('strix --target https://example.com --skills-dir /etc/passwd', '/home/fahmi/Downloads/UNF/cy1/degre', { allowRoots: ['/home/fahmi/muse-bug-bounty'] }).allowed, false);

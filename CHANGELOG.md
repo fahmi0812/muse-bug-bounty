@@ -2,6 +2,12 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.2] — 2026-11-24
+
+### Fixed
+- **`bounty run` — flag Strix diperbaiki dari usage asli (bukan dugaan).** Run pertama dari folder degre lolos guard tapi Strix menolak argumen: `--budget` TIDAK PERNAH ADA (dugaan kita), `--skills-dir` hanya ada di Strix upstream terbaru — tidak ada di build Strix terinstal di laptop (usage-nya tidak mencantumkan keduanya). Kini perintah Strix hanya `--target … --max-budget <budget> --max-turns <n>`; skill diteruskan lewat env `STRIX_SKILLS_DIR` (diverifikasi nyata di upstream `strix/skills/__init__.py`: `SKILLS_DIR_ENV`). `eval/measure-baseline.mjs`, `scripts/baseline-laptop.sh` (Langkah 0), README, dan docs/TEAM.md ikut diperbaiki.
+- **Exit 2 Strix yang sebenarnya error argumen tidak lagi disangka "temuan ditemukan".** Sebelumnya wrapper mengira semua exit 2 = vulns found, lalu mencetak ringkasan sukses 0 temuan — menyesatkan. Kini bila output mengandung `unrecognized arguments` / `usage: strix` / `strix: error:`, run dilaporkan sebagai error (exit 2, tanpa ringkasan sukses, tanpa mencatat run) dengan pesan jelas bahwa ini bug wrapper.
+
 ## [1.13.1] — 2026-11-24
 
 ### Fixed

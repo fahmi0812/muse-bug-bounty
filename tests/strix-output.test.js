@@ -45,10 +45,10 @@ test("parseStrixOutput: teks kosong -> 0 temuan", () => {
 
 test("run nyata dengan strix palsu: skill diteruskan + hasil masuk store", () => {
   const dir = mkdtempSync(join(tmpdir(), "bounty-fake-strix-"));
-  // Strix palsu: cetak --skills-dir yang diterima + temuan JSON + biaya.
+  // Strix palsu: cetak STRIX_SKILLS_DIR yang diterima + temuan JSON + biaya.
   writeFileSync(join(dir, "strix"), `#!/bin/sh
 echo "skills-dir=$STRIX_SKILLS_DIR"
-echo "$@" | grep -q -- "--skills-dir" && echo "HAS_SKILLS_DIR"
+echo "$@" | grep -q -- "--max-budget" && echo "HAS_MAX_BUDGET"
 echo "$@" | grep -q -- "--max-turns" && echo "HAS_MAX_TURNS"
 cat <<'EOF'
 [{"endpoint":"/api/users?id=1","method":"GET","param":"id","vuln_class":"SQL Injection","cwe":"CWE-89"}]
@@ -59,13 +59,45 @@ echo 'Total cost: $0.42'
   const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db };
   const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/users", "--program", "programs/example.md"], { cwd: ROOT, env, encoding: "utf8" });
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(r.stdout, /HAS_SKILLS_DIR/);
+  // Skill diteruskan lewat env STRIX_SKILLS_DIR (bukan flag --skills-dir:
+  // flag itu tidak ada di Strix terinstal — diverifikasi dari usage asli).
+  assert.match(r.stdout, /skills-dir=.*skills\/bounty/);
+  assert.match(r.stdout, /--max-budget 5/);
+  assert.doesNotMatch(r.stdout, /--budget 5/);
+  assert.doesNotMatch(r.stdout, /--skills-dir/);
+  assert.match(r.stdout, /HAS_MAX_BUDGET/);
   assert.match(r.stdout, /HAS_MAX_TURNS/);
   assert.match(r.stdout, /1 kandidat baru masuk store/);
   assert.match(r.stdout, /\$0\.42/);
   // Review: kandidat ada di antrean
   const r2 = spawnSync(process.execPath, [CLI, "findings", "--program", "Example Program"], { cwd: ROOT, env, encoding: "utf8" });
   assert.match(r2.stdout, /SQL Injection/);
+});
+
+test("run nyata: error argumen Strix (exit 2) dilaporkan sebagai error, bukan 'temuan ditemukan'", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-cli-error-"));
+  // Kasus nyata 24 Nov 2026: Strix terinstal menolak --budget/--skills-dir
+  // (argparse exit 2) tapi wrapper lama menyangkanya "temuan ditemukan"
+  // dan mencetak ringkasan sukses 0 temuan.
+  const fakeStrix = join(ROOT, "strix");
+  const runsDir = join(ROOT, "strix_runs");
+  try {
+    writeFileSync(fakeStrix, `#!/bin/sh
+echo "usage: strix [-h] [-v] [--update] [-t TARGET]" >&2
+echo "strix: error: unrecognized arguments: --budget 100" >&2
+exit 2
+`, { mode: 0o755 });
+    const db = join(dir, "bounty.db");
+    const env = { ...process.env, PATH: `${ROOT}:${process.env.PATH}`, BOUNTY_DB: db };
+    const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/", "--program", "programs/example.md"], { cwd: ROOT, env, encoding: "utf8" });
+    assert.equal(r.status, 2, r.stderr + r.stdout);
+    assert.match(r.stderr + r.stdout, /Strix menolak argumen/);
+    assert.doesNotMatch(r.stdout, /temuan ditemukan/);
+    assert.doesNotMatch(r.stdout, /Ringkasan run/);
+  } finally {
+    rmSync(fakeStrix, { force: true });
+    rmSync(runsDir, { recursive: true, force: true });
+  }
 });
 
 test("readStrixArtifacts: run.json + vulnerabilities.json jadi sumber utama", () => {

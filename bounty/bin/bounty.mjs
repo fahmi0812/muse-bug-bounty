@@ -60,10 +60,10 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.1";
+export const VERSION = "1.13.2";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
-// Root repo (untuk --skills-dir): bounty/bin/ -> ../../
+// Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const SKILLS_DIR = process.env.STRIX_SKILLS_DIR || resolve(REPO_ROOT, "skills", "bounty");
 
@@ -611,7 +611,7 @@ async function runSingleTarget(args, targetOverride = null) {
     console.log("  Jalankan: bounty install --strix   (menampilkan perintah resmi, tanpa auto-run)");
     console.log("  Baru menginstal Strix? Muat ulang PATH dulu: source ~/.bashrc (atau buka terminal baru).");
     if (args["dry-run"]) {
-      console.log(`[dry-run] skills-dir: ${SKILLS_DIR} (akan diteruskan ke Strix via --skills-dir / STRIX_SKILLS_DIR)`);
+      console.log(`[dry-run] skills-dir: ${SKILLS_DIR} (akan diteruskan ke Strix via env STRIX_SKILLS_DIR — flag --skills-dir tidak ada di Strix terinstal)`);
       console.log("[dry-run] Instruksi yang akan dikirim ke Strix:");
       console.log(buildInstruction(program, role));
       return { code: done(0, "dry-run"), usd: 0, added: 0, findings: [] };
@@ -622,14 +622,19 @@ async function runSingleTarget(args, targetOverride = null) {
   // 4. Pre-exec guard + rate limiter
   // Rate limiter: TokenBucket menegakkan rate request WRAPPER (pre/post
   // run). Request internal Strix TIDAK lewat bucket ini — Strix dibatasi
-  // lewat --max-budget-usd / --max-turns + instruksi rate di bawah, dan
+  // lewat --max-budget / --max-turns + instruksi rate di bawah, dan
   // itu ditulis jujur di README (bukan klaim penegakan penuh).
   const rate = Number(program.rateLimit) || 10;
   const bucket = new TokenBucket(rate, rate);
   const maxTurns = Number(args["max-turns"] ?? DEFAULT_MAX_TURNS);
   const skillsDir = existsSync(SKILLS_DIR) ? SKILLS_DIR : null;
-  const strixArgs = ["--target", target, "--budget", String(budget), "--max-budget-usd", String(budget), "--max-turns", String(maxTurns)];
-  if (skillsDir) strixArgs.push("--skills-dir", skillsDir);
+  // Flag Strix diverifikasi dari usage Strix asli di laptop (24 Nov 2026):
+  // --budget TIDAK ADA (dugaan kita), --skills-dir hanya ada di Strix
+  // upstream terbaru (bukan di build terinstal) — skill diteruskan lewat
+  // env STRIX_SKILLS_DIR (upstream: strix/skills/__init__.py,
+  // SKILLS_DIR_ENV). Budget: --max-budget (di usage); --max-budget-usd
+  // juga diterima build terinstal, tapi --max-budget yang terdokumentasi.
+  const strixArgs = ["--target", target, "--max-budget", String(budget), "--max-turns", String(maxTurns)];
   const cmd = `strix ${strixArgs.join(" ")}`;
   // Guard workspace = cwd pengguna (boleh jalan dari folder mana saja),
   // plus folder instal tool sendiri (skills/ tinggal di sana).
@@ -674,6 +679,16 @@ async function runSingleTarget(args, targetOverride = null) {
   //    temuan; sumber utama temuan/biaya adalah artefak strix_runs/
   //    (run.json + vulnerabilities.json), stdout hanya fallback.
   const code = res.status ?? 0;
+  // Error argumen Strix (mis. flag tidak dikenal di versi Strix terinstal)
+  // keluar dengan exit 2 juga — jangan disangka "temuan ditemukan".
+  // Ciri: usage/error argparse di output. Laporkan sebagai error, tanpa
+  // ringkasan sukses dan tanpa mencatat run.
+  const combinedOut = stdout + "\n" + stderr;
+  if (/unrecognized arguments|usage: strix|strix: error:/i.test(combinedOut)) {
+    console.error("\nStrix menolak argumen perintah (flag tidak dikenal di versi Strix terinstal).");
+    console.error("Ini bug wrapper, bukan target — perbaiki flag di bounty/bin/bounty.mjs, lalu ulangi run.");
+    return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
+  }
   const strixOk = code === 0 || code === 2;
   if (code === 2) console.log("\nStrix exit 2 = temuan ditemukan (bukan error).");
   try {

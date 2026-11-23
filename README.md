@@ -41,7 +41,7 @@ tanpa pembayaran, tanpa deposit.
 
 | Mode | Cara pakai | Provider |
 | --- | --- | --- |
-| **1 — Muse skill** | Instal skill `skills/bounty/` ke Muse; agen memakai Strix lewat `--skills-dir` | Tanpa provider — pakai model Muse yang sedang berjalan |
+| **1 — Muse skill** | Instal skill `skills/bounty/` ke Muse; agen memakai Strix lewat env `STRIX_SKILLS_DIR` | Tanpa provider — pakai model Muse yang sedang berjalan |
 | **2 — Standalone CLI** | `bounty setup` sekali, lalu `bounty run` | Provider picker ala Lumitome (OpenAI / Anthropic / 9router lokal, pilih saat setup pertama) |
 
 Mode 1 tidak butuh API key apa pun. Mode 2 butuh key provider yang user
@@ -181,7 +181,7 @@ npm run bench             # eval/run-bench.mjs — mock (deterministik) + gate b
 npm run measure-baseline  # LIVE: ukur baseline Strix vs bounty di lab Docker (butuh Docker + Strix, di laptop)
 ```
 
-`bounty run` sekarang meneruskan skill ke Strix (`--skills-dir` + `STRIX_SKILLS_DIR`), lalu mem-parse output Strix (JSON / JSONL / Markdown) menjadi kandidat di `bounty.db` — semua berstatus `candidate` (UNVERIFIED) sampai disetujui di `bounty review`. Biaya terukur dari output (`Total cost: $X`) dicatat di tabel `run`. **v1.1:** sumber utama temuan/biaya adalah artefak Strix `strix_runs/<run>/run.json` + `vulnerabilities.json` (stdout hanya fallback); Strix exit 2 = "vulns found" dipetakan ke sukses-dengan-temuan (bukan error); `STRIX_TELEMETRY=0` disetel saat spawn.
+`bounty run` sekarang meneruskan skill ke Strix lewat env `STRIX_SKILLS_DIR` (flag `--skills-dir` tidak ada di Strix versi terinstal di laptop — diverifikasi dari usage Strix 24 Nov 2026), lalu mem-parse output Strix (JSON / JSONL / Markdown) menjadi kandidat di `bounty.db` — semua berstatus `candidate` (UNVERIFIED) sampai disetujui di `bounty review`. Biaya terukur dari output (`Total cost: $X`) dicatat di tabel `run`. **v1.1:** sumber utama temuan/biaya adalah artefak Strix `strix_runs/<run>/run.json` + `vulnerabilities.json` (stdout hanya fallback); Strix exit 2 = "vulns found" dipetakan ke sukses-dengan-temuan (bukan error); `STRIX_TELEMETRY=0` disetel saat spawn.
 
 **v1.1 — runner on-demand:** `bounty scan --tool nuclei|dalfox|ffuf --target URL --program programs/<nama>.md` menjalankan tool itu (bila terinstal; bila tidak ada, dilewati tanpa error) dan menyimpan temuannya sebagai kandidat. Bench kini juga mengukur **akurasi router** (top-5 skill vs oracle per lab; mock saat ini: dvga 100%, dvwa 88%, juice-shop 70%, vampi 63%, llm-app 33%).
 
@@ -217,7 +217,7 @@ tidak turun dibanding baseline Strix. Detail di
   `git push`, `git reset --hard`, baca `.env`, pipe-to-shell, ...).
   Hanya perintah yang diizinkan (mis. `strix --target ...`) yang jalan.
 - **Budget** — default **$5/target**; run berhenti saat budget habis.
-- **Rate limit** — default **10 req/detik** global, dengan backoff. Jujur: bucket menegakkan rate request wrapper; request internal Strix dibatasi lewat `--max-budget-usd` / `--max-turns` + instruksi, bukan lewat bucket wrapper.
+- **Rate limit** — default **10 req/detik** global, dengan backoff. Jujur: bucket menegakkan rate request wrapper; request internal Strix dibatasi lewat `--max-budget` / `--max-turns` + instruksi, bukan lewat bucket wrapper.
 - **Kredensial** — `providers.json` / `credentials.json` disimpan
   mode `0600`, masuk `.gitignore`, tidak pernah dikirim ke mana pun
   selain provider yang user pilih.

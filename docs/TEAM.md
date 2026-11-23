@@ -41,7 +41,7 @@ kontribusi kode/test/docs.
 
 ## Budget & rate limit (default, jangan diubah diam-diam)
 
-- Budget: **$5/target** (`--max-budget-usd`, default).
+- Budget: **$5/target** (`--max-budget`, default).
 - Rate limit: **10 req/detik** global per target, hormati 429 + backoff.
 - Naik budget di atas $5 atau ubah rate limit = keputusan maintainer,
   dicatat di PR + CHANGELOG, bukan edit diam-diam.

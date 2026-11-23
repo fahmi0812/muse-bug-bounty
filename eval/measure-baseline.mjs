@@ -54,7 +54,7 @@ export function measureLab(lab, mode, runs = 1) {
     const started = Date.now();
     let res;
     if (mode === "baseline") {
-      res = run("strix", ["--target", target, "--budget", "5", "--max-budget-usd", "5", "--max-turns", "500"]);
+      res = run("strix", ["--target", target, "--max-budget", "5", "--max-turns", "500"]);
     } else {
       res = run(process.execPath, [BOUNTY, "run", "--target", target, "--program", join(ROOT, "programs", `${lab}.md`), "--budget", "5"], { env: { ...process.env, BOUNTY_DB: join(ROOT, ".bounty", `bench-${lab}.db`) } });
     }

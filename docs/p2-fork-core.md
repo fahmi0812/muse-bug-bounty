@@ -11,7 +11,7 @@ Fork core penuh hanya bila salah satu terjadi dan terbukti di eval:
 
 1. Extension-first tidak bisa mengubah perilaku Strix yang dibutuhkan
    (mis. alur agen internal, cara Strix memanggil tool, format output
-   yang tidak bisa dipetakan lewat `--skills-dir`).
+   yang tidak bisa dipetakan lewat skill (env `STRIX_SKILLS_DIR`).
 2. Patch yang dibutuhkan harus hidup di dalam loop utama Strix, bukan
    di wrapper `bounty`.
 3. Baseline eval menunjukkan batas extension (TP/FP mentok) dan ada
