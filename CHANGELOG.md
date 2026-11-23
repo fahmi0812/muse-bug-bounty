@@ -5,7 +5,7 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 ## [Unreleased]
 
 ### Fixed
-- **`bounty/bin/bounty.mjs` kini executable (mode 755 di git).** Instal global kadang berakhir "Permission denied" karena file bin tersimpan 644 dan npm tidak selalu menambahkan +x. Kini mode executable ikut terlacak di repo, jadi instal global berikutnya langsung bisa jalan tanpa `chmod` manual.
+- **Catatan: mode executable 755 TIDAK jadi dipakai.** Eksperimen instal global di VM membuktikan npm selalu memaksa +x pada file bin saat instal (sumber 644 pun terinstal 770 dan jalan) — jadi mode 644 di repo bukan penyebab "Permission denied" di laptop Fahmi, dan push snapshot ternyata menyimpan mode 100644 apa pun yang ada di index (remote `356b2f6` tetap 100644). Commit mode 755 sudah dikembalikan ke 644. Penyebab Permission denied di laptop masih diselidiki — kemungkinan instal global terakhir tidak selesai mengganti file, atau symlink `~/.local/bin/bounty` menunjuk ke tempat lain; diagnosis via `ls -l` di laptop.
 
 ## [1.13.0] — 2026-11-24
 
