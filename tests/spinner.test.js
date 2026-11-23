@@ -56,6 +56,13 @@ test('spinner: teks panjang dipotong sesuai lebar terminal', () => {
   sp.stop();
 });
 
+test('spinner: stop sebelum start tidak menulis apa-apa (tidak hapus baris Strix)', () => {
+  const stream = fakeStream();
+  const sp = new Spinner({ stream, enabled: true });
+  sp.stop();
+  assert.equal(stream.writes.length, 0);
+});
+
 test('spinner: printLine cetak baris sendiri di atas spinner, lalu spinner lanjut', async () => {
   const stream = fakeStream();
   const sp = new Spinner({ stream, enabled: true });

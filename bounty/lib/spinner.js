@@ -44,6 +44,7 @@ export class Spinner {
     this.frame = 0;
     this.startedAt = 0;
     this.text = "";
+    this.started = false;
   }
 
   start(text = "") {
@@ -51,6 +52,7 @@ export class Spinner {
     this.text = stripAnsi(text);
     this.startedAt = Date.now();
     this.frame = 0;
+    this.started = true;
     this.render();
     this.timer = setInterval(() => {
       this.frame += 1;
@@ -78,11 +80,12 @@ export class Spinner {
   }
 
   stop() {
-    if (!this.enabled) return;
+    if (!this.enabled || !this.started) return;
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = null;
     }
+    this.started = false;
     this.clear();
   }
 

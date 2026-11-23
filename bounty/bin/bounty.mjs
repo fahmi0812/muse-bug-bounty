@@ -19,6 +19,7 @@ import { detectModels, saveProvider, writeStrixConfig, loadProviders, loadProvid
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { Spinner, isInformative, phaseText } from "../lib/spinner.js";
+import { chooseStrixStdio } from "../lib/stdio.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
 import { checkFailOn, severityFor } from "../lib/failon.js";
 import { color, table, summaryBox, formatUsd, progressBar, severityBadge, phaseLine, heading, hint } from "../lib/ui.js";
@@ -63,7 +64,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.9";
+export const VERSION = "1.14.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -688,26 +689,43 @@ async function runSingleTarget(args, targetOverride = null) {
 
   // 5. Jalankan Strix (tanpa API berbayar dari wrapper ini — Strix memakai
   //    konfigurasi provider yang sudah disetel lewat `bounty provider`).
-  //    Output di-pipe (bukan inherit) agar bisa diparse ke store — tapi
-  //    spawnSync MEMBLOKIR event loop sehingga CLI diam total selagi
-  //    Strix jalan (pull image Docker + berpikir, bisa bermenit-menit).
-  //    Karena itu pakai spawn async + spinner status satu baris (frame
-  //    berputar + waktu berjalan + baris terakhir output Strix, TTY saja).
+  //    Mode stdio:
+  //    - TTY (interaktif): stdio "inherit" — Strix menulis LANGSUNG ke
+  //      terminal pemakai, jadi UI live bawaan Strix (Rich: progress,
+  //      tabel temuan real-time) tampil penuh, persis seperti
+  //      menjalankan `strix` sendiri. Inilah yang diminta Fahmi:
+  //      proses kerja harus nampak transparan. Wrapper tidak butuh
+  //      pipe stdout Strix — sejak v1.1 sumber utama temuan/biaya
+  //      adalah artefak strix_runs/<run>/run.json +
+  //      vulnerabilities.json (+ SARIF); stdout hanya fallback.
+  //      Spinner dimatikan di mode ini (layar milik Strix).
+  //    - Bukan TTY (pipe/CI/tes): tetap pipe + spinner + live lines,
+  //      supaya output bisa diparse dan dites.
+  //    Paksa salah satu: BOUNTY_STRIX_STDIO=inherit|pipe.
   console.log(`Menjalankan: ${cmd}`);
   const instruction = buildInstruction(program, role);
   const startedAt = Date.now();
+  const inheritStdio = chooseStrixStdio({ stdoutTTY: process.stdout.isTTY }) === "inherit";
   const spinner = new Spinner();
-  spinner.start("Strix sedang bekerja…");
+  if (!inheritStdio) spinner.start("Strix sedang bekerja…");
   let res;
   // Baris live terakhir yang sudah dicetak (hindari duplikat beruntun).
   let lastLiveLine = "";
   let lastPhase = "";
   try {
     res = await new Promise((resolve) => {
-      const child = spawn(strix, [...strixArgs, "--instruction", instruction], {
+      const env = {
         // Privasi tim: telemetri Strix dimatikan (default Strix = 1).
-        env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), ...providerEnv, STRIX_TELEMETRY: "0" },
-      });
+        ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), ...providerEnv, STRIX_TELEMETRY: "0",
+      };
+      const args = [...strixArgs, "--instruction", instruction];
+      if (inheritStdio) {
+        const child = spawn(strix, args, { stdio: "inherit", env });
+        child.on("error", (err) => resolve({ error: err, status: null, stdout: "", stderr: "" }));
+        child.on("close", (status) => resolve({ error: null, status, stdout: "", stderr: "" }));
+        return;
+      }
+      const child = spawn(strix, args, { env });
       let stdout = "", stderr = "";
       child.stdout.setEncoding("utf8");
       child.stderr.setEncoding("utf8");
@@ -768,7 +786,25 @@ async function runSingleTarget(args, targetOverride = null) {
   // Ciri: usage/error argparse di output. Laporkan sebagai error, tanpa
   // ringkasan sukses dan tanpa mencatat run.
   const combinedOut = stdout + "\n" + stderr;
-  if (/unrecognized arguments|usage: strix|strix: error:/i.test(combinedOut)) {
+  if (inheritStdio) {
+    // Mode inherit: output Strix tampil langsung di terminal — pemakai
+    // sudah melihat alasannya bila gagal. Exit 2 "temuan" vs exit 2
+    // "argumen ditolak" dibedakan lewat artefak: tanpa artefak run
+    // baru, Strix tidak pernah mulai hunt (argumen ditolak saat parse).
+    if (code !== 0 && code !== 2) {
+      console.error(`\nStrix gagal jalan (exit ${code}). Lihat output Strix di atas.`);
+      return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
+    }
+    if (code === 2) {
+      const probe = readStrixArtifacts(process.cwd(), startedAt);
+      if (probe.findings.length === 0 && probe.usd === 0) {
+        console.error("\nStrix menolak argumen perintah (flag tidak dikenal di versi Strix terinstal).");
+        console.error("Ini bug wrapper, bukan target — perbaiki flag di bounty/bin/bounty.mjs, lalu ulangi run.");
+        return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
+      }
+    }
+    // Lanjut ke parse umum di bawah: temuan/biaya dibaca dari artefak.
+  } else if (/unrecognized arguments|usage: strix|strix: error:/i.test(combinedOut)) {
     console.error("\nStrix menolak argumen perintah (flag tidak dikenal di versi Strix terinstal).");
     console.error("Ini bug wrapper, bukan target — perbaiki flag di bounty/bin/bounty.mjs, lalu ulangi run.");
     return { code: done(2, "error"), usd: 0, added: 0, findings: [] };

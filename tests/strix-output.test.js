@@ -209,6 +209,67 @@ echo 'Total cost: $0.42'
   assert.doesNotMatch(r.stdout + r.stderr, /\x1b\[2K/);
 });
 
+test("run nyata mode inherit: Strix tulis artefak -> temuan masuk store (stdout tidak di-pipe)", () => {
+  // Kasus nyata 24 Nov 2026: Fahmi minta UI live bawaan Strix tampil
+  // penuh ("dihubungkan ke Strix"). Di mode inherit, stdout Strix
+  // langsung ke terminal — temuan dibaca dari artefak strix_runs.
+  const dir = mkdtempSync(join(tmpdir(), "bounty-inherit-"));
+  mkdirSync(join(dir, "programs"), { recursive: true });
+  copyFileSync(join(ROOT, "programs", "example.md"), join(dir, "programs", "example.md"));
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+mkdir -p strix_runs/run-1
+cat > strix_runs/run-1/run.json <<'EOF'
+{"status": "completed", "usage": {"total_cost_usd": 1.23}}
+EOF
+cat > strix_runs/run-1/vulnerabilities.json <<'EOF'
+[{"url": "https://example.com/api/search?q=x", "method": "GET", "param": "q", "vuln_class": "SQL Injection", "cwe": "CWE-89", "severity": "High"}]
+EOF
+echo "Strix live UI line here"
+exit 2
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir, BOUNTY_STRIX_STDIO: "inherit" };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/search", "--program", "programs/example.md"], { cwd: dir, env, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /Strix live UI line here/, 'output Strix harus tampil (inherit)');
+  assert.match(r.stdout, /1 kandidat baru masuk store/);
+  assert.match(r.stdout, /Strix exit 2 = temuan ditemukan/);
+  assert.doesNotMatch(r.stdout + r.stderr, /\x1b\[2K/, 'mode inherit tidak pakai spinner');
+});
+
+test("run nyata mode inherit: exit 2 tanpa artefak = argumen ditolak, bukan temuan", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-inherit-"));
+  mkdirSync(join(dir, "programs"), { recursive: true });
+  copyFileSync(join(ROOT, "programs", "example.md"), join(dir, "programs", "example.md"));
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+echo "usage: strix ..."
+exit 2
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir, BOUNTY_STRIX_STDIO: "inherit" };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/", "--program", "programs/example.md"], { cwd: dir, env, encoding: "utf8" });
+  assert.equal(r.status, 2, r.stderr + r.stdout);
+  assert.match(r.stderr + r.stdout, /menolak argumen/);
+  assert.doesNotMatch(r.stdout, /Ringkasan run/);
+});
+
+test("run nyata mode inherit: exit 1 dilaporkan gagal + tunjuk output Strix di atas", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-inherit-"));
+  mkdirSync(join(dir, "programs"), { recursive: true });
+  copyFileSync(join(ROOT, "programs", "example.md"), join(dir, "programs", "example.md"));
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+echo "boom" >&2
+exit 1
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir, BOUNTY_STRIX_STDIO: "inherit" };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/", "--program", "programs/example.md"], { cwd: dir, env, encoding: "utf8" });
+  assert.equal(r.status, 2, r.stderr + r.stdout);
+  assert.match(r.stderr + r.stdout, /Strix gagal jalan \(exit 1\)/);
+  assert.match(r.stderr + r.stdout, /Lihat output Strix di atas/);
+  assert.doesNotMatch(r.stdout, /Ringkasan run/);
+});
+
 test("readStrixArtifacts: run.json + vulnerabilities.json jadi sumber utama", () => {
   const dir = mkdtempSync(join(tmpdir(), "bounty-artifacts-"));
   const runDir = join(dir, "strix_runs", "run-1");

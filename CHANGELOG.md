@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.14.0] — 2026-11-24
+
+### Added
+- **`bounty run` kini menjalankan Strix dengan stdio inherit bila terminal interaktif** — UI live bawaan Strix (Rich: progress, tabel temuan real-time) tampil penuh di terminal, persis seperti menjalankan `strix` sendiri. Alasan kenapa selama ini tidak begitu: wrapper mem-pipe stdout Strix untuk mem-parse temuan — dan begitu di-pipe, Strix mendeteksi "No terminal attached" lalu jalan headless (UI live mati, hanya baris status sesekali). Padahal sejak v1.1 sumber utama temuan/biaya adalah artefak `strix_runs/<run>/run.json` + `vulnerabilities.json` (+ SARIF), jadi pipe sudah tidak dibutuhkan lagi. Bila bukan TTY (pipe/CI/tes) tetap pipe + spinner + live lines seperti sebelumnya. Paksa salah satu mode: `BOUNTY_STRIX_STDIO=inherit|pipe`. Exit 2 "temuan" vs "argumen ditolak" di mode inherit dibedakan lewat artefak (tanpa artefak run baru = argumen ditolak); exit non-zero lain dilaporkan dengan "Lihat output Strix di atas" (pemakai sudah melihat alasannya di layar). File baru `bounty/lib/stdio.js` (`chooseStrixStdio`) + 4 tes stdio + 3 tes E2E mode inherit; `Spinner.stop()` kini no-op bila belum start (jangan hapus baris Strix).
+
 ## [1.13.9] — 2026-11-24
 
 ### Added
