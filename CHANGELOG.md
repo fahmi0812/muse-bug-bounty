@@ -4,6 +4,19 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.6.0] — 2026-11-23
+
+### Added
+- **v1.6 — semua P1 deep research (P1-1 s.d. P1-7), berurutan:**
+  - **P1-1 GraphQL recovery:** `bounty/lib/graphql.js` — `bounty graphql --target URL [--field user]` (fingerprint, introspeksi, rebuild schema gaya clairvoyance bila introspeksi dimatikan, tes BOLA/alias/batching; schema hasil tebakan ditandai partial). 11 test.
+  - **P1-2 Cloud enum + takeover:** `bounty/lib/cloud.js` — `bounty cloud --tool takeover|cloud-enum|s3scanner|aws-s3-ls|nuclei-takeovers` (17 fingerprint layanan, cloud_enum, s3scanner, `aws s3 ls --no-sign-request`, nuclei `http/takeovers/`). Tanpa kredensial, tanpa klaim — fingerprint wajib verifikasi manual. Prowler sengaja TIDAK di-wire (opt-in berkredensial). 12 test.
+  - **P1-3 RE runner headless gated:** `bounty/lib/reverse.js` — `bounty reverse --tool ghidra-mcp|rea|jadx --file <binary/APK> --confirm true` (GhidraMCP 2.0 pin Ghidra 12.1.4, REA 6.8.0, jadx APK; file lokal + konfirmasi operator wajib; nilai secret tidak masuk temuan) + `eval/benchmarks/crackmebench.md`. 10 test.
+  - **P1-4 Mobile statis:** `bounty/lib/mobile.js` — `bounty scan --tool mobsf|jadx` (MobSF REST upload/scan/report_json, image kanonik `opensecurity/mobile-security-framework-mobsf:4.5.3`, auth header = kunci mentah bukan Bearer; jadx + parse manifest). Frida/Objection dinamis TIDAK di-wire. 10 test.
+  - **P1-5 Strix parity:** `bounty run --fail-on low|medium|high|critical` (exit 3 bila temuan ≥ ambang; severity heuristik dari kelas vuln, bukan CVSS), `--pause` (state jeda `.bounty/pause-<ts>.json`, exit 4) + `--resume <file>`, HTTP evidence ID (request-id Strix/Caido disimpan sebagai evidence kandidat), per-run timings (`BOUNTY_RECORD_TIMINGS=1` → `.bounty/timings.jsonl`), `bounty dedup` (validasi kunci kanonik), `bounty codesearch --dir --pattern` (ripgrep bila ada, fallback jalan kaki file). 5 test.
+  - **P1-6 Enterprise identity skills:** 6 skill baru (Entra/M365, Okta, vCenter, SSL-VPN, SharePoint ToolShell, Cloud IAM) — hanya CVE publik terverifikasi (vCenter 2024-37079/37080/38812, 2025-22224/22225/22226; Fortinet 2024-21762/55591, 2023-27997; Palo Alto 2024-3400/5910; Citrix 2023-3519/4966; SharePoint ToolShell 2025-53770/53771/49704/49706). Index skill 61 → **67**.
+  - **P1-7 Caido MCP live:** `bounty/lib/caido.js` + `docs/caido.md` — `bounty caido --list [--filter Q] | --replay <id>` (read/replay saja, nama tool diselesaikan adaptif dari `tools/list`). 9 test.
+- **Batasan jujur v1.6.0:** tidak ada satu pun runner P1 yang pernah jalan live (binary tidak ada di VM — flag CLI + bentuk output best-effort, verifikasi di laptop); paket npm `@caido/mcp-server` mengembalikan 404 (23 Nov 2026) — jalur terverifikasi = clone `caido/mcp-caido` + `node dist/index.js` via `--mcp-path`; image MobSF `opensecurity/mobsf:v4.5.3` tidak ada di Docker Hub (pakai `opensecurity/mobile-security-framework-mobsf:4.5.3`); pin MobSF 4.5.3 mendahului publikasi CVE-2026-104585 — jangan asumsikan sudah ditambal; baseline live P0-1 + oracle LLMVault tetap menunggu laptop. Bug ketemu saat integrasi: `cmdPatterns` kehilangan baris `loadPatterns()` saat edit (diperbaiki, test 311/311).
+
 ## [1.5.0] — 2026-11-23
 
 ### Added

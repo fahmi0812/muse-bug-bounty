@@ -1,6 +1,6 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.5.0 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.6.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
@@ -147,6 +147,8 @@ npm run measure-baseline  # LIVE: ukur baseline Strix vs bounty di lab Docker (b
 **v1.3.1 — 8 skill Tier 2 tertunda selesai** dengan parafrase defensif (fokus deteksi + validasi, minim payload mentah): `hunt-dom` (yang sempat kena flag — kini lolos), `hunt-nodejs`, `hunt-http-smuggling`, `hunt-jwt-crypto`, `hunt-llm-ai`, `hunt-api-misconfig`, `web2-recon`, `bug-bounty`. Index 57 entri; akurasi router llm-app naik 33% → 67% (mock).
 
 **v1.5 — semua P0 (P0-2 s.d. P0-7):** pola bersitasi 12 → 85 (73 berlink HackerOne asli), recon pipeline (subfinder/dnsx/httpx/katana/nuclei KEV/crt.sh), jsluice + sourcemapper, interactsh OAST, LLM 2026 (OWASP LLM01–10 + ASI01–10, garak agent-breaker, PyRIT), platform read-only (scope sync, cek duplikat, draft — tanpa auto-submit). Index skill kini 61. Runner baru belum pernah jalan live (binary tidak ada di VM).
+
+**v1.6 — semua P1 (P1-1 s.d. P1-7):** GraphQL recovery (`bounty graphql`), cloud enum + takeover (`bounty cloud`), RE headless gated (`bounty reverse`), mobile statis MobSF + jadx (`bounty scan --tool mobsf|jadx`), parity Strix (`--fail-on`, `--pause`/`--resume`, evidence ID, timings, `bounty dedup`, `bounty codesearch`), 6 skill enterprise identity, Caido MCP live (`bounty caido`). Index skill kini 67. Tidak ada runner P1 yang pernah jalan live (binary tidak ada di VM); `@caido/mcp-server` 404 di npm — pakai clone `caido/mcp-caido`.
 
 **v1.4 — baseline pack P0-1:** panduan XBEN (104 tantangan, subset 10 untuk sinyal awal) + EthiBench (108 GT, versi dipatok) di `eval/benchmarks/`, eksportir temuan → `findings.jsonl`, dan `scripts/baseline-laptop.sh` satu perintah di laptop. Baseline live-nya sendiri masih menunggu laptop — pack ini membuatnya siap jalan, bukan menjalankannya.
 

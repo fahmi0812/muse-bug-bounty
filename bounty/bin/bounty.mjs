@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
 // Commands: provider | run | review | report | bench | install | programs | findings | scan | memory | graph | trace | --help | --version
-import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync, mkdirSync, appendFileSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -16,7 +16,9 @@ import { getRoleProfile, buildInstruction } from "../lib/auth.js";
 import { detectModels, saveProvider, writeStrixConfig, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
-import { dedupCandidates } from "../lib/dedup.js";
+import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
+import { checkFailOn } from "../lib/failon.js";
+import { searchCode } from "../lib/codesearch.js";
 import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
 import { budgetStatus } from "../lib/cost.js";
 import { runQueue } from "../lib/queue.js";
@@ -29,11 +31,16 @@ import { runSubfinder, runDnsx, runHttpx, runKatana, runNucleiKev, updateNucleiT
 import { runJsluice, runSourcemapper } from "../lib/jsmining.js";
 import { startInteractsh, pollInteractsh, stopInteractsh } from "../lib/oast.js";
 import { runGarakAgentBreaker, runPyrit } from "../lib/llm-runners.js";
+import { fingerprintGraphql, introspectSchema, rebuildSchemaFromClairvoyance, testBola } from "../lib/graphql.js";
+import { checkTakeover, runCloudEnum, runS3Scanner, runAwsS3Ls, runNucleiTakeovers, CLOUD_TOOLS } from "../lib/cloud.js";
+import { runGhidraMcp, runRea, runJadxApk } from "../lib/reverse.js";
+import { runMobsf, runJadx } from "../lib/mobile.js";
+import { startCaidoMcp, listRequests, replayRequest, stopCaidoMcp } from "../lib/caido.js";
 import { getProgramScope, searchHacktivity, draftReport, syncScopeToProgram } from "../lib/platforms.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
-export const VERSION = "1.5.0";
+export const VERSION = "1.6.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -49,6 +56,30 @@ Penggunaan:
   bounty run [--program programs/example.md] [--target URL] [--role low|high]
              [--budget 5] [--dry-run] [--targets URL1,URL2]
       --targets: antrean multi-target (satu per satu, satu pool budget).
+      --fail-on low|medium|high|critical: exit 3 bila ada temuan >= ambang
+        (severity heuristik dari kelas vuln — bukan CVSS).
+      --pause: bila budget habis di tengah antrean, simpan state jeda
+        (.bounty/pause-<ts>.json) dan exit 4. --resume <file>: lanjutkan.
+      BOUNTY_RECORD_TIMINGS=1: tulis timings per fase ke .bounty/timings.jsonl.
+  bounty dedup [--program <nama>]
+      Validasi keputusan dedup: kelompokkan kandidat per kunci kanonik,
+      laporkan bila ada kunci yang muncul >1 kali (seharusnya 0).
+  bounty codesearch --dir <dir> --pattern <regex> [--max N]
+      Cari pola di kode (ripgrep bila ada, fallback jalan kaki file).
+      Hanya baca, tidak menulis.
+  bounty graphql --target URL [--program P] [--field user]
+      Fingerprint + introspeksi (atau rebuild clairvoyance bila dimatikan)
+      + tes BOLA/alias/batching. Temuan masuk store sebagai kandidat.
+  bounty cloud --tool takeover|cloud-enum|s3scanner|aws-s3-ls|nuclei-takeovers
+      --target X [--program P]
+      Enum cloud + deteksi takeover tanpa kredensial. Fingerprint takeover
+      wajib verifikasi manual — tidak pernah mengklaim apa pun.
+  bounty reverse --tool ghidra-mcp|rea|jadx --file <binary/APK> --confirm true
+      RE headless gated: file lokal dalam scope saja. Nilai secret tidak
+      pernah masuk temuan.
+  bounty caido [--list] [--filter Q] [--limit N] | --replay <id>
+      Jalur proxy live Caido MCP (read/replay saja). Butuh Caido lokal +
+      server MCP (clone caido/mcp-caido, --mcp-path dist/index.js).
   bounty view
       Buka dashboard Strix (strix view) di background.
       Jalankan Strix dalam scope program. Scope-gate dulu, lalu pre-exec
@@ -178,6 +209,26 @@ async function cmdProvider(args) {
 }
 
 async function runSingleTarget(args, targetOverride = null) {
+  // P1-5: per-run timings (analogue STRIX_RUN_RECORD_TIMINGS) — dicatat
+  // bila BOUNTY_RECORD_TIMINGS=1, ke .bounty/timings.jsonl + stdout.
+  const t0 = Date.now();
+  const mark = {};
+  const recordTimings = () => {
+    if (process.env.BOUNTY_RECORD_TIMINGS !== "1") return;
+    const timings = {
+      at: new Date().toISOString(), target: targetOverride || args.target || "",
+      scope_ms: (mark.scope ?? t0) - t0,
+      guard_ms: (mark.guard ?? mark.scope ?? t0) - (mark.scope ?? t0),
+      strix_ms: (mark.strix ?? mark.guard ?? t0) - (mark.guard ?? mark.scope ?? t0),
+      parse_ms: Date.now() - (mark.strix ?? t0),
+      total_ms: Date.now() - t0,
+    };
+    try {
+      mkdirSync(join(process.cwd(), ".bounty"), { recursive: true, mode: 0o700 });
+      appendFileSync(join(process.cwd(), ".bounty", "timings.jsonl"), JSON.stringify(timings) + "\n");
+    } catch {}
+    console.log(`Timings: scope ${timings.scope_ms}ms, guard ${timings.guard_ms}ms, strix ${timings.strix_ms}ms, parse ${timings.parse_ms}ms, total ${timings.total_ms}ms.`);
+  };
   const programPath = args.program || resolve(process.cwd(), "programs/example.md");
   if (!existsSync(programPath)) {
     console.error(`Program tidak ditemukan: ${programPath}`);
@@ -200,6 +251,7 @@ async function runSingleTarget(args, targetOverride = null) {
     try { logAudit({ command: "run", target, program: program.name, result: "blocked" }); } catch {}
     return 2;
   }
+  mark.scope = Date.now();
 
   // 2. Budget + role (auth-minimal)
   const budget = Number(args.budget ?? program.maxBudgetUsd ?? DEFAULT_BUDGET_USD);
@@ -249,6 +301,7 @@ async function runSingleTarget(args, targetOverride = null) {
     return { code: done(2, "blocked"), usd: 0, added: 0, findings: [] };
   }
   await bucket.acquire();
+  mark.guard = Date.now();
 
   if (args["dry-run"]) {
     console.log(`[dry-run] strix ditemukan di ${strix}; perintah yang akan jalan: ${cmd}`);
@@ -269,6 +322,7 @@ async function runSingleTarget(args, targetOverride = null) {
     env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), STRIX_TELEMETRY: "0" },
   });
   if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return { code: done(2, "error"), usd: 0, added: 0, findings: [] }; }
+  mark.strix = Date.now();
   const stdout = String(res.stdout ?? "");
   const stderr = String(res.stderr ?? "");
   if (stdout) process.stdout.write(stdout);
@@ -302,7 +356,12 @@ async function runSingleTarget(args, targetOverride = null) {
         }
       } catch {}
       if (sarifFindings.length > 0) console.log(`Artefak Strix: ${sarifFindings.length} temuan dari strix_runs/findings.sarif.`);
-      const findings = [...parsed.findings, ...artifacts.findings.map((f) => ({ ...f, program: program.name })), ...sarifFindings];
+  // P1-5: HTTP evidence ID ala Strix 1.7 — ID request (Caido/proxy) yang
+  // dibawa temuan Strix disimpan sebagai evidence agar temuan bisa
+  // dilacak ke request aslinya. Hanya field request-id eksplisit yang
+  // dipakai (requestId/request_id/http_request_id/caido_request_id).
+  const withEvidenceId = (f) => ({ ...f, httpEvidenceId: f.requestId ?? f.request_id ?? f.http_request_id ?? f.caido_request_id ?? null });
+  const findings = [...parsed.findings, ...artifacts.findings.map((f) => ({ ...f, program: program.name })), ...sarifFindings].map(withEvidenceId);
       const usd = artifacts.usd > 0 ? artifacts.usd : parsed.usd;
       if (artifacts.findings.length > 0) console.log(`Artefak Strix: ${artifacts.findings.length} temuan dari strix_runs/vulnerabilities.json${artifacts.usd > 0 ? `, biaya $${artifacts.usd} dari run.json` : ""}.`);
       const existing = store.listCandidates(program.name, "candidate")
@@ -311,7 +370,10 @@ async function runSingleTarget(args, targetOverride = null) {
       const fresh = unique.slice(existing.length);
       let added = 0;
       for (const f of fresh) {
-        store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
+        const cid = store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
+        if (f.httpEvidenceId) {
+          try { store.addEvidence(cid, "http-request-id", String(f.httpEvidenceId)); } catch {}
+        }
         added++;
       }
       store.addRun({ version: "bounty", target, lab: program.name, tp: 0, fp: 0, fn: 0, timeMs: Date.now() - startedAt, usd });
@@ -336,13 +398,38 @@ async function runSingleTarget(args, targetOverride = null) {
       } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); }
     } finally { store.close(); }
   } catch (e) { console.error(`Peringatan: gagal menyimpan hasil ke store: ${e.message}`); }
+  recordTimings();
   return { code: done(strixOk ? 0 : code, strixOk ? (code === 2 ? "ok-findings" : "ok") : "failed"), usd: runUsd, added: runAdded, findings: runFindings };
 }
 
 // v1.3 multi-target: `bounty run --targets url1,url2` menjalankan target
 // satu per satu (bukan paralel) dengan satu pool budget --budget; antrean
 // berhenti bila biaya total mencapai budget. Satu target = perilaku lama.
+// P1-5: --fail-on <sev> (exit 3 bila temuan >= ambang), --pause (tulis
+// state jeda bila budget habis, exit 4), --resume <file> (lanjutkan sisa).
 async function cmdRun(args) {
+  const failOn = String(args["fail-on"] ?? "").toLowerCase();
+  if (failOn && !["low", "medium", "high", "critical"].includes(failOn)) {
+    console.error("--fail-on wajib: low | medium | high | critical.");
+    return 2;
+  }
+  const failCheck = (findings) => {
+    if (!failOn) return 0;
+    const hit = checkFailOn(findings, failOn);
+    if (!hit.triggered) return 0;
+    console.log(`--fail-on ${failOn} terpicu: ${hit.count} temuan >= ${failOn} (terparah: ${hit.worst}). Exit 3.`);
+    return 3;
+  };
+  if (args.resume) {
+    const pauseFile = resolve(String(args.resume));
+    if (!existsSync(pauseFile)) { console.error(`File jeda tidak ditemukan: ${pauseFile}`); return 2; }
+    const paused = JSON.parse(readFileSync(pauseFile, "utf8"));
+    if (!paused.remaining?.length) { console.log("Tidak ada target tersisa di file jeda."); return 0; }
+    const remainingBudget = Number(paused.budget ?? 0) - Number(paused.spent ?? 0);
+    if (remainingBudget <= 0) { console.error(`Budget sudah habis ($${paused.spent ?? 0}/$${paused.budget ?? 0}) — naikkan budget atau mulai antrean baru.`); return 2; }
+    console.log(`Melanjutkan ${paused.remaining.length} target tersisa (budget sisa $${remainingBudget}).`);
+    args = { ...args, targets: paused.remaining.join(","), budget: String(remainingBudget), program: paused.program ?? args.program };
+  }
   if (args.targets) {
     const targets = String(args.targets).split(",").map((t) => t.trim()).filter(Boolean);
     if (targets.length === 0) { console.error("--targets butuh daftar URL dipisah koma."); return 2; }
@@ -353,17 +440,31 @@ async function cmdRun(args) {
       budget = Number(args.budget ?? program.maxBudgetUsd ?? DEFAULT_BUDGET_USD);
     } catch {}
     console.log(`Antrean multi-target: ${targets.length} target, budget total $${budget} (berhenti bila tercapai).`);
+    const allFindings = [];
     const summary = await runQueue(targets, async (t) => {
       const r = await runSingleTarget({ ...args, target: t }, t);
+      allFindings.push(...(r.findings ?? []));
       return { status: r.code === 0 ? "ok" : "failed", usd: r.usd, findings: r.findings };
     }, {
       budget,
       onProgress: (p) => console.log(`[${p.done}/${p.total}] ${p.target}: ${p.status}, $${p.usd} (total $${p.totalUsd})`),
     });
     console.log(`Antrean selesai: ${summary.done}/${summary.total} target, total biaya $${summary.totalUsd}${summary.stopped ? " (berhenti: budget habis)" : ""}.`);
+    if (summary.stopped && args.pause) {
+      const remaining = targets.slice(summary.done);
+      const pauseFile = join(process.cwd(), ".bounty", `pause-${Date.now()}.json`);
+      mkdirSync(join(process.cwd(), ".bounty"), { recursive: true, mode: 0o700 });
+      writeFileSync(pauseFile, JSON.stringify({ program: args.program || "programs/example.md", budget, spent: summary.totalUsd, remaining, at: new Date().toISOString() }, null, 2), { mode: 0o600 });
+      console.log(`Jeda: ${remaining.length} target tersisa disimpan ke ${pauseFile}. Lanjutkan: bounty run --resume ${pauseFile}`);
+      return 4;
+    }
+    const failCode = failCheck(allFindings);
+    if (failCode) return failCode;
     return summary.stopped || summary.results.every((r) => r.status === "ok" || r.status === "done") ? 0 : 2;
   }
   const r = await runSingleTarget(args);
+  const failCode = failCheck(r.findings ?? []);
+  if (failCode) return failCode;
   return r.code;
 }
 
@@ -587,7 +688,25 @@ function cmdReport(args) {
   }
 }
 
-const SCAN_TOOLS = [...SUPPORTED_TOOLS, "jsluice", "sourcemapper", "garak-agent-breaker", "pyrit"];
+const SCAN_TOOLS = [...SUPPORTED_TOOLS, "jsluice", "sourcemapper", "garak-agent-breaker", "pyrit", "mobsf", "jadx"];
+
+// Simpan temuan ke store (dedup vs kandidat yang sudah ada). Dipakai
+// cmdScan + perintah P1 (graphql/cloud/reverse) agar polanya sama.
+function storeFindings(program, findings = []) {
+  const store = new Store();
+  try {
+    const existing = store.listCandidates(program.name, "candidate")
+      .map((c) => ({ endpoint: c.endpoint, method: c.method, param: c.param, vuln_class: c.vuln_class, cwe: c.cwe }));
+    const { unique } = dedupCandidates([...existing, ...findings]);
+    const fresh = unique.slice(existing.length);
+    let added = 0;
+    for (const f of fresh) {
+      store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
+      added++;
+    }
+    return { added, total: findings.length };
+  } finally { store.close(); }
+}
 
 async function cmdScan(args) {
   const tool = String(args.tool ?? "").toLowerCase();
@@ -607,9 +726,9 @@ async function cmdScan(args) {
     return 2;
   }
   const program = loadProgramFile(programPath);
-  // jsluice boleh menarget file JS lokal (bukan URL) — scope gate URL
-  // ditangani lib jsmining untuk URL; file lokal adalah input pengguna.
-  const isLocalJs = tool === "jsluice" && !/^https?:\/\//i.test(String(target));
+  // jsluice/mobsf/jadx boleh menarget file lokal (bukan URL) — scope gate
+  // URL ditangani lib masing-masing; file lokal adalah input pengguna.
+  const isLocalJs = (tool === "jsluice" && !/^https?:\/\//i.test(String(target))) || tool === "mobsf" || tool === "jadx";
   const scope = isLocalJs ? { ok: true } : checkScope(program, target);
   console.log(scope.ok ? "Scope OK" : `Scope DITOLAK: ${scope.reason}`);
   if (!scope.ok) {
@@ -640,6 +759,12 @@ async function cmdScan(args) {
       return 2;
     }
     result = runPyrit(target, { program, timeoutMs, strategy: args.strategy ?? "crescendo", objective: args.objective, model: args.model, maxTurns: Number(args["max-turns"] ?? 10) });
+  } else if (tool === "mobsf") {
+    // P1-4: MobSF async (fetch REST). File APK/IPA lokal, program dicek
+    // resolveProgram di lib (basename harus terdaftar bila apps ada).
+    result = await runMobsf(target, { program, timeoutMs, mobsfUrl: args["mobsf-url"], useDocker: args.docker === "true" || args.docker === true });
+  } else if (tool === "jadx") {
+    result = runJadx(target, { program, timeoutMs });
   }
   if (result.error) {
     console.error(result.error);
@@ -818,6 +943,144 @@ async function cmdPlatform(args) {
   return 2;
 }
 
+function cmdDedup(args) {
+  const store = new Store();
+  try {
+    const program = args.program ? String(args.program) : null;
+    const list = store.listCandidates(program, "candidate");
+    const groups = new Map();
+    for (const c of list) {
+      const k = canonicalKey({ endpoint: c.endpoint, method: c.method, param: c.param, vulnClass: c.vuln_class, cwe: c.cwe });
+      groups.set(k, (groups.get(k) ?? []).concat(c));
+    }
+    const dupes = [...groups.entries()].filter(([, v]) => v.length > 1);
+    console.log(`Dedup: ${list.length} kandidat, ${groups.size} kunci unik, ${dupes.length} kunci duplikat.`);
+    for (const [k, v] of dupes.slice(0, 10)) {
+      console.log(`  DUPLIKAT x${v.length}: ${k} (id: ${v.map((c) => c.id).join(", ")})`);
+    }
+    if (dupes.length === 0) console.log("Validasi lolos: tidak ada kunci duplikat di store.");
+    return dupes.length === 0 ? 0 : 1;
+  } finally { store.close(); }
+}
+
+function cmdCodesearch(args) {
+  const dir = args.dir ? resolve(String(args.dir)) : null;
+  const pattern = args.pattern ? String(args.pattern) : "";
+  if (!dir || !pattern) { console.error("Pakai: bounty codesearch --dir <dir> --pattern <regex> [--max N]"); return 2; }
+  const r = searchCode(dir, pattern, { maxResults: Number(args.max ?? 50) });
+  if (r.error) { console.error(r.error); return 2; }
+  console.log(`[${r.tool}] ${r.results.length} kecocokan dalam ${r.time_ms} ms.`);
+  for (const hit of r.results) console.log(`  ${hit.file}:${hit.line}: ${hit.text}`);
+  return 0;
+}
+
+// ---- P1 commands ----
+
+async function cmdGraphql(args) {
+  const target = args.target;
+  const programPath = args.program || resolve(process.cwd(), "programs/example.md");
+  if (!target) { console.error("Pakai: bounty graphql --target URL [--program programs/<nama>.md] [--field user]"); return 2; }
+  if (!existsSync(programPath)) { console.error(`Program tidak ditemukan: ${programPath}`); return 2; }
+  const program = loadProgramFile(programPath);
+  const fp = await fingerprintGraphql(target, { program });
+  if (fp.error) { console.error(fp.error); return 2; }
+  if (!fp.isGraphql) { console.log("Bukan endpoint GraphQL (tidak merespons query GraphQL)."); return 0; }
+  console.log(`GraphQL terdeteksi. Introspeksi: ${fp.introspectionEnabled === true ? "aktif" : fp.introspectionEnabled === false ? "dimatikan" : "tidak diketahui"}.`);
+  let schema = null;
+  if (fp.introspectionEnabled) {
+    const intro = await introspectSchema(target, { program });
+    if (intro.error) console.error(`Introspeksi gagal: ${intro.error}`);
+    else schema = intro.schema;
+  }
+  if (!schema) {
+    console.log("Introspeksi tidak tersedia — rebuild schema gaya clairvoyance (tebakan, partial).");
+    const rebuilt = await rebuildSchemaFromClairvoyance(target, { program });
+    if (rebuilt.error) { console.error(rebuilt.error); return 2; }
+    schema = rebuilt.schema;
+    console.log(`Schema hasil tebakan: ${schema.types?.length ?? 0} type, confidence: ${rebuilt.confidence}.`);
+  }
+  const bola = await testBola(target, schema, { program, field: args.field ?? "", ownId: args["own-id"] ?? "1", otherId: args["other-id"] ?? "2" });
+  if (bola.error) { console.error(bola.error); return 2; }
+  for (const c of bola.checks ?? []) console.log(`  - ${c.name}: ${c.result}`);
+  const { added, total } = storeFindings(program, bola.findings ?? []);
+  console.log(`GraphQL: ${total} temuan kandidat, ${added} baru masuk store.`);
+  return 0;
+}
+
+function cmdCloud(args) {
+  const tool = String(args.tool ?? "").toLowerCase();
+  const target = args.target;
+  const programPath = args.program || resolve(process.cwd(), "programs/example.md");
+  if (!CLOUD_TOOLS.includes(tool) && tool !== "takeover") {
+    console.error(`--tool wajib: takeover | ${CLOUD_TOOLS.join(" | ")} (dapat: "${tool || ""}")`);
+    return 2;
+  }
+  if (!target) { console.error("--target wajib (domain / bucket / CNAME / URL)."); return 2; }
+  if (!existsSync(programPath)) { console.error(`Program tidak ditemukan: ${programPath}`); return 2; }
+  const program = loadProgramFile(programPath);
+  let result;
+  if (tool === "takeover") {
+    // checkTakeover async (fetch body opsional) — tanpa fetch hanya kenali layanan.
+    return checkTakeover(target, { program }).then((r) => {
+      if (r.error) { console.error(r.error); return 2; }
+      console.log(`CNAME ${target}: layanan ${r.service ?? "(tidak dikenal)"}, vulnerable: ${r.vulnerable}, claimable: ${r.claimable ?? "?"}.`);
+      if (r.vulnerable) console.log("  VERIFIKASI MANUAL dulu sebelum melapor — fingerprint bukan bukti klaim.");
+      return 0;
+    });
+  }
+  if (tool === "cloud-enum") result = runCloudEnum(target, { program });
+  else if (tool === "s3scanner") result = runS3Scanner(target, { program });
+  else if (tool === "aws-s3-ls") result = runAwsS3Ls(target, { program });
+  else result = runNucleiTakeovers(target, { program });
+  if (result.error) { console.error(result.error); return 2; }
+  if (result.skipped) { console.log(`Dilewati: ${result.reason}`); return 0; }
+  const { added, total } = storeFindings(program, result.findings ?? []);
+  console.log(`Cloud [${tool}]: ${total} temuan kandidat, ${added} baru masuk store.`);
+  return 0;
+}
+
+async function cmdReverse(args) {
+  const tool = String(args.tool ?? "").toLowerCase();
+  const file = args.file;
+  if (!["ghidra-mcp", "rea", "jadx"].includes(tool)) { console.error("--tool wajib: ghidra-mcp | rea | jadx"); return 2; }
+  if (!file) { console.error("--file <path binary/APK> wajib."); return 2; }
+  if (args.confirm !== true && args.confirm !== "true") {
+    console.error("RE gated: tambahkan --confirm true — Anda memastikan file ini dalam scope program dan boleh dianalisis.");
+    return 2;
+  }
+  let result;
+  if (tool === "ghidra-mcp") result = await runGhidraMcp(file, { confirmed: true });
+  else if (tool === "rea") result = runRea(file, { confirmed: true });
+  else result = runJadxApk(file, { confirmed: true });
+  if (result.error) { console.error(result.error); return 2; }
+  if (result.skipped) { console.log(`Dilewati: ${result.reason}`); return 0; }
+  const programName = args.program ? loadProgramFile(args.program).name : "reverse";
+  const { added, total } = storeFindings({ name: programName }, result.findings ?? []);
+  console.log(`RE [${tool}]: ${total} temuan kandidat, ${added} baru masuk store (nilai secret tidak pernah disimpan).`);
+  return 0;
+}
+
+async function cmdCaido(args) {
+  // One-shot: start MCP -> list/replay -> stop. Read/replay saja.
+  const session = await startCaidoMcp({ mcpPath: args["mcp-path"] ?? null, caidoUrl: args["caido-url"] ?? undefined });
+  if (session.skipped) { console.log(`Dilewati: ${session.reason}`); return 0; }
+  if (session.error) { console.error(session.error); return 2; }
+  try {
+    if (args.replay) {
+      const r = await replayRequest(session, String(args.replay));
+      if (r.error) { console.error(r.error); return 2; }
+      console.log(`Replay #${args.replay}: HTTP ${r.status}`);
+      console.log(String(r.bodyPreview ?? "").slice(0, 2000));
+      return 0;
+    }
+    const list = await listRequests(session, { filter: args.filter ?? "", limit: Number(args.limit ?? 20) });
+    if (list.error) { console.error(list.error); return 2; }
+    console.log(`Caido: ${list.requests?.length ?? 0} request (tool: ${list.tool ?? "?"}).`);
+    for (const q of list.requests ?? []) console.log(`  #${q.id} ${q.method} ${q.url} -> ${q.status ?? "?"}`);
+    return 0;
+  } finally { stopCaidoMcp(session); }
+}
+
 function cmdPatterns(args) {
   const patterns = loadPatterns();
   const cited = citedPatterns(patterns);
@@ -917,6 +1180,12 @@ export async function main(argv = process.argv.slice(2)) {
     case "oast": return await cmdOast(args);
     case "platform": return await cmdPlatform(args);
     case "patterns": return cmdPatterns(args);
+    case "dedup": return cmdDedup(args);
+    case "codesearch": return cmdCodesearch(args);
+    case "graphql": return await cmdGraphql(args);
+    case "cloud": return await cmdCloud(args);
+    case "reverse": return await cmdReverse(args);
+    case "caido": return await cmdCaido(args);
     case "install": return cmdInstall(args);
     default:
       console.error(`Perintah tidak dikenal: ${cmd}\n`);
