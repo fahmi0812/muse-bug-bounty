@@ -1,0 +1,26 @@
+# Lab eval lokal — OPSIONAL, hanya bila pilih Docker saat install.
+# Tanpa Docker, bench tetap jalan mode no-docker (lihat eval/README.md).
+# Jangan jalankan lab ini terhadap target nyata — ini lab lokal saja.
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    ports:
+      - "3000:3000"
+    networks: [bounty-lab]
+
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    ports:
+      - "8080:80"
+    networks: [bounty-lab]
+
+  vampi:
+    image: erev0s/vampi:latest
+    ports:
+      - "5000:5000"
+    networks: [bounty-lab]
+
+networks:
+  bounty-lab:
+    driver: bridge
+    internal: false

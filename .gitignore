@@ -1,0 +1,20 @@
+# bounty.db — store SQLite lokal (jangan commit)
+bounty.db
+bounty.db-journal
+bounty.db-wal
+bounty.db-shm
+
+# state lokal
+.bounty/
+evidence/
+credentials.json
+providers.json
+.env
+*.log
+*.tmp
+
+# deps & build
+node_modules/
+.strix/
+coverage/
+eval/results/

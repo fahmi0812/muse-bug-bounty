@@ -1,0 +1,145 @@
+# muse-bug-bounty
+
+Tool `bounty` — pembungkus aman dan ringan di atas
+[Strix](https://github.com/usestrix/strix) (`usestrix/strix`, Apache-2.0)
+untuk bug bounty web-first: scope gate, guard pra-eksekusi, rate limiter
+global, dan satu store `bounty.db`. Nol dependensi, $0, tanpa auto-submit,
+tanpa pembayaran, tanpa deposit.
+
+> **Strix TIDAK dibundel di repo ini.** Strix diinstal oleh user
+> (lihat [Install](#install)). Repo ini hanya berisi wrapper `bounty`,
+> skill Muse, eval harness, dan installer.
+
+## Dua mode
+
+| Mode | Cara pakai | Provider |
+| --- | --- | --- |
+| **1 — Muse skill** | Instal skill `skills/bounty/` ke Muse; agen memakai Strix lewat `--skills-dir` | Tanpa provider — pakai model Muse yang sedang berjalan |
+| **2 — Standalone CLI** | `bounty run --target ... --program ...` | Provider picker ala Lumitome (OpenAI / Anthropic / dst, pilih saat setup pertama) |
+
+Mode 1 tidak butuh API key apa pun. Mode 2 butuh key provider yang user
+pasang sendiri sekali di awal (`bounty install` → wizard provider);
+key disimpan lokal dengan mode file `0600`, tidak pernah di-commit.
+
+## Install
+
+Butuh Node.js >= 20. Pilih salah satu:
+
+```bash
+# Linux / macOS
+curl -fsSL https://raw.githubusercontent.com/fahmi0812/muse-bug-bounty/main/scripts/install.sh | bash
+# atau dari clone:
+git clone https://github.com/fahmi0812/muse-bug-bounty.git
+cd muse-bug-bounty
+bash scripts/install.sh
+```
+
+```powershell
+# Windows (PowerShell)
+.\scripts\install.ps1
+```
+
+Installer menanyakan **Docker [1] Ya / [2] Tidak** (default 1).
+Docker hanya dipakai untuk lab eval lokal (Juice Shop, DVWA, VAmPI);
+tanpa Docker, bench tetap jalan dalam mode no-docker (lihat
+[eval/README.md](eval/README.md)).
+
+```bash
+# Non-interaktif:
+BOUNTY_DOCKER=1 bash scripts/install.sh   # dengan Docker
+BOUNTY_DOCKER=0 bash scripts/install.sh   # tanpa Docker
+bash scripts/install.sh --no-docker       # flag juga bisa
+```
+
+Lalu instal Strix (bukan bagian repo ini):
+
+```bash
+curl -sSL https://strix.ai/install | bash
+```
+
+Dan, hanya untuk Mode 2, jalankan wizard provider sekali:
+
+```bash
+bounty install
+```
+
+## Quickstart
+
+```bash
+# Kering dulu — tidak ada request keluar, tidak ada temuan dikirim
+bounty run --target https://example.com --program example --dry-run
+
+# Jalan sungguhan (butuh Strix terinstal + scope program terdaftar)
+bounty run --target https://example.com --program example
+
+# Lihat program & temuan yang tersimpan
+bounty programs
+bounty findings --program example
+```
+
+Sebelum jalan, daftarkan scope program di `programs/<nama>.json`
+(contoh ada di `programs/`). Target di luar scope **ditolak** oleh
+scope gate sebelum request apa pun dikirim.
+
+## Struktur repo
+
+```text
+muse-bug-bounty/
+├── bounty/
+│   ├── bin/bounty.mjs      # CLI entrypoint
+│   └── lib/                # router, dedup, rate, scope, guard,
+│                           # provider, store (SQLite bounty.db), auth, bench
+├── skills/bounty/          # Muse skill (Mode 1)
+├── programs/               # definisi scope program (contoh)
+├── eval/
+│   ├── oracle/labels/      # ground truth Juice Shop / DVWA / VAmPI
+│   ├── run-bench.mjs       # bench TP/FP/FN vs baseline Strix
+│   ├── docker-compose.yml  # lab lokal (opsional, butuh Docker)
+│   └── results/            # hasil bench (latest.json)
+├── scripts/                # install.sh / install.ps1 / install.js
+├── tests/                  # node:test, tanpa network/Docker/Strix
+├── README.md
+└── LICENSE                 # Apache-2.0
+```
+
+## Test & bench
+
+```bash
+npm test          # node --test tests/ — deterministik, tanpa network
+npm run bench     # eval/run-bench.mjs — mode no-docker bila Docker tak ada
+```
+
+Bench menjalankan tiap lab 3× (mock findings deterministik, seed tetap),
+menghitung TP/FP/FN/precision/recall per run dan median lintas run,
+lalu menyimpan `eval/results/latest.json`. Gate: FP harus turun dan TP
+tidak turun dibanding baseline Strix. Detail di
+[eval/README.md](eval/README.md).
+
+## Keamanan
+
+- **Scope gate** — host/path di luar scope program ditolak sebelum
+  request keluar. Tidak ada scanning liar.
+- **Guard pra-eksekusi** — perintah destruktif diblokir (`rm -rf`,
+  `git push`, `git reset --hard`, baca `.env`, pipe-to-shell, ...).
+  Hanya perintah yang diizinkan (mis. `strix --target ...`) yang jalan.
+- **Budget** — default **$5/target**; run berhenti saat budget habis.
+- **Rate limit** — default **10 req/detik** global, dengan backoff.
+- **Kredensial** — `providers.json` / `credentials.json` disimpan
+  mode `0600`, masuk `.gitignore`, tidak pernah dikirim ke mana pun
+  selain provider yang user pilih.
+- **Tanpa auto-submit / pembayaran** — temuan hanya disimpan lokal
+  (`bounty.db` + `evidence/`); submit ke program selalu manual oleh user.
+
+## Lisensi & atribusi
+
+Repo ini berlisensi **Apache License 2.0** (lihat `LICENSE`).
+
+- **Strix** (`usestrix/strix`) — Apache-2.0. Base tool; tidak dibundel.
+- Pola & ide yang dipelajari (bukan salinan kode verbatim):
+  - **Claude-BugHunter** — MIT (katalog skill bounty).
+  - **Cloudflare**-related bounty tooling — MIT.
+  - **OWASP** (Juice Shop, testing guide) — MIT.
+  - **Shannon, ARTEX, VulnHunter** — AGPL (pola deteksi saja;
+    tidak ada kodenya di repo ini).
+- Lab eval: **OWASP Juice Shop**, **DVWA**, **VAmPI** — masing-masing
+  dengan lisensinya sendiri (lihat repo lab terkait).
