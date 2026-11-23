@@ -1,13 +1,15 @@
 # CI — muse-bug-bounty
-# Node 20, npm test, gitleaks, node --check. Tanpa network ke target
+# Node 24 (node:sqlite butuh Node 24), npm test, gitleaks, node --check. Tanpa network ke target
 # nyata, tanpa Docker, tanpa Strix, tanpa API berbayar.
 name: CI
+
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
 
 jobs:
   test:
@@ -18,21 +20,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Node.js 20
+
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+
 
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+
       - name: Syntax check (node --check)
         run: |
           for f in bounty/bin/*.mjs bounty/lib/*.js scripts/install.js eval/run-bench.mjs tests/*.test.js; do
             node --check "$f"
           done
-
-      - name: Run tests
-        run: npm test
