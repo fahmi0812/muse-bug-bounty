@@ -28,3 +28,20 @@ IDOR tulis → ubah data orang lain.
   milik sendiri (lab / akun test).
 - Kontrol negatif: ID acak yang tidak ada harus 404, bukan data orang.
 - Simpan respons kedua akun sebagai bukti perbandingan.
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- GraphQL `node()`: resolver global `node(id)` tanpa cek pemilik — uji dengan global ID milik akun test lain.
+- ID bocor di bundle JS: cari pola ID di file JS statis — ID yang tidak tampil di UI tapi ada di bundle adalah permukaan enumerasi.
+- Enum terarah: buat daftar ID di sekitar nilai yang dikenal (±500), filter respons berdasarkan panjang / status — hanya untuk akun test sendiri.
+- Method tampering penuh: coba GET / POST / PUT / PATCH / DELETE / OPTIONS / HEAD ke endpoint yang sama — satu method bisa lupa cek otorisasi.
+- Soft-delete IDOR: objek yang sudah dihapus masih bisa dibaca — uji ID lama milik akun testmu.
+
+### Chain tambahan
+IDOR ganti email + tanpa re-auth → minta reset password → link jatuh ke email penyerang → ATO.
+
+### Catatan Gate-0 tambahan
+- Kontrol negatif: ID acak yang tidak ada harus 404; bandingkan respons dua akun test milikmu, bukan sekadar status 200.
+- Data yang "bocor" harus benar-benar milik akun lain — respons yang sama untuk semua akun (mis. data publik) bukan IDOR.

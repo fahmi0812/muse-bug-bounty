@@ -25,3 +25,20 @@ dampak — laporkan dengan bukti field sensitif terekspos.
 - Replay dengan akun low-priv harus gagal untuk field sensitif.
 - Jangan ambil data user nyata; pakai akun test.
 - Simpan query + respons (redaksi data sensitif).
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- Field suggestion probe: kirim field yang tidak ada — respons "Did you mean: [field asli]?" berarti skema bisa dienumerasi walau introspeksi dimatikan.
+- Batch amplification: satu request berisi banyak query ber-alias — uji apakah server mengeksekusi semuanya (tanda tidak ada batas kompleksitas).
+- Subscription hijack: langganan channel milik akun test lain — uji apakah event real-time akun lain sampai ke sesimu.
+- Alias batching pada mutasi verifikasi: satu request berisi beberapa alias mutasi yang sama — bila semuanya dievaluasi, rate limit per-request bisa dilewati; uji dengan 2–3 alias berkode salah pada akun test sendiri, jangan menebak kode.
+- RC desync: beri akses lewat REST, cabut lewat REST, lalu tegaskan lagi lewat mutasi GraphQL — bila akses kembali, otorisasi REST dan GraphQL tidak sinkron.
+
+### Chain tambahan
+Introspeksi → enum field sensitif → BOLA via `node()` → ekstraksi massal lintas tenant.
+
+### Catatan Gate-0 tambahan
+- Field harus mengembalikan data akun test lain; skema terekspos saja tanpa data = bukan temuan.
+- Subscription yang hanya menerima event milik sendiri bukan celah — buktikan event akun test lain benar-benar sampai.

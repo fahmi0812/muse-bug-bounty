@@ -1,4 +1,4 @@
-// tests/patterns-cited.test.js — pola BERSITASI P0-2 (73 pola, 14 skill).
+// tests/patterns-cited.test.js — pola BERSITASI P0-2 + v1.9 (112 pola, 21 skill).
 // Aturan: tiap pola bersitasi wajib punya h1_report_id + link
 // https://hackerone.com/reports/<id> yang cocok dengan ID-nya; pola
 // uncited wajib tanpa link; tidak boleh ada (skill, h1_report_id) ganda.
@@ -22,12 +22,19 @@ const EXPECTED_CITED_PER_SKILL = {
   "hunt-saml": 5,
   "hunt-sqli": 4,
   "hunt-ssti": 4,
+  "hunt-idor": 6,
+  "hunt-dom": 6,
+  "hunt-jwt-crypto": 5,
+  "hunt-mfa-bypass": 5,
+  "hunt-cache-poison": 5,
+  "hunt-http-smuggling": 8,
+  "hunt-auth-bypass": 4,
 };
 
-test("cited: 73 pola bersitasi dari 14 skill, semuanya lolos validatePattern", () => {
+test("cited: 112 pola bersitasi dari 21 skill, semuanya lolos validatePattern", () => {
   const list = loadPatterns();
   const cited = citedPatterns(list);
-  assert.equal(cited.length, 73);
+  assert.equal(cited.length, 112);
   for (const p of cited) assert.equal(validatePattern(p), true);
   const perSkill = {};
   for (const p of cited) perSkill[p.skill] = (perSkill[p.skill] ?? 0) + 1;

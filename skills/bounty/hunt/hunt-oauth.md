@@ -42,3 +42,20 @@ Validasi redirect/state/audience diserahkan ke client, atau tidak ada sama sekal
 - Replay dengan akun low-priv harus gagal; dengan akun test korban (milikmu) berhasil.
 - Buktikan dengan akun test sendiri, bukan akun user nyata.
 - Simpan request/response, redaksi token/cookie.
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- State CSRF: `state` tetap sama antar sesi atau bisa dipakai ulang — uji dengan memulai flow dari akun test A lalu memakai callback code A di sesi akun test B (milik sendiri).
+- Token/nonce bocor lewat Referer: setelah callback, periksa request keluar dari halaman landing — code atau token di header Referer = bocor ke pihak ketiga.
+- Token endpoint tanpa autentikasi client: tukar code tanpa `client_secret`, atau dengan akun test yang belum terverifikasi email — uji apakah penukaran tetap berhasil.
+- OIDC discovery: baca `.well-known/openid-configuration` — `registration_endpoint` yang terbuka berarti siapa pun bisa mendaftarkan client dengan `redirect_uri` sendiri.
+- Cross-client token confusion: token dari client A dicoba ke API client B — bila diterima, API tidak mengecek audience.
+
+### Chain tambahan
+Open redirect di domain resmi → `redirect_uri` lolos validasi → code jatuh ke penyerang → tukar jadi sesi akun test korban (ATO).
+
+### Catatan Gate-0 tambahan
+- Code yang dicuri harus benar-benar bisa ditukar jadi sesi akun test lain; redirect ke domain luar tanpa code = open redirect saja, bukan ATO.
+- Token yang bocor lewat Referer hanya berarti bila token itu masih hidup dan bisa dipakai — cek dengan replay ke API sebagai akun test.

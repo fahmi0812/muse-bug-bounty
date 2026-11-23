@@ -16,13 +16,13 @@ function runCli(args, env = {}) {
   return r;
 }
 
-test("v1.8 CLI: --version mencetak 1.8.0; index skill 67 entri", async () => {
+test("v1.9 CLI: --version mencetak 1.9.0; index skill 89 entri", async () => {
   const r = runCli(["--version"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /bounty v1\.8\.0/);
+  assert.match(r.stdout, /bounty v1\.9\.0/);
   const { readFileSync } = await import("node:fs");
   const idx = JSON.parse(readFileSync(join(ROOT, "skills/bounty/skills-index.json"), "utf8"));
-  assert.equal(idx.length, 67);
+  assert.equal(idx.length, 89);
   for (const n of ["hunt-entra-m365", "hunt-okta", "hunt-vcenter", "hunt-ssl-vpn", "hunt-sharepoint", "hunt-cloud-iam"]) {
     assert.ok(idx.some((x) => x.name === n), n);
   }

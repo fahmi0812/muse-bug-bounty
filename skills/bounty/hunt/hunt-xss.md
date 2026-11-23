@@ -28,3 +28,20 @@ nyata, jangan klaim curi cookie bila cookie HttpOnly).
 - `alert(1)` di browser bersih membuktikan eksekusi, bukan sekadar tampil.
 - Stored: buktikan dari akun kedua (milik sendiri) bahwa payload tampil.
 - Simpan screenshot + URL, redaksi data akun lain.
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- Context probe: kirim satu string berisi semua pembatas (tanda kutip, `<`, `>`, backtick) lalu lihat yang mana lolos encoding — itu menentukan konteksnya (HTML / atribut / JS / URL).
+- Blind / stored OOB: pasang beacon ke server log milikmu; yang dihitung adalah eksekusi di sesi bersih lain, bukan sekadar payload tampil di responsmu sendiri.
+- Sanitizer bypass: kombinasi tag bersarang (math/style, svg/style) — sanitizer yang hanya memblokir satu tag bisa dilewati kombinasi.
+- Link `javascript:` / markdown: konten yang dirender sebagai link — uji klik di sesi test sendiri.
+- DOM sink via hash: ubah fragment URL lalu lihat apakah datanya masuk ke sink (`innerHTML` / `eval`) tanpa reload dari server.
+
+### Chain tambahan
+XSS reflected + cache poisoning → payload tersimpan di CDN → eksekusi ke semua pengunjung (kelas Kettle).
+
+### Catatan Gate-0 tambahan
+- `alert(1)` di browser bersih = bukti eksekusi; payload yang hanya tampil di HTML tanpa eksekusi bukan XSS.
+- Stored harus dibuktikan dari akun kedua (milik sendiri) bahwa payload tampil di sesi lain — pantulan di sesimu sendiri tidak cukup.

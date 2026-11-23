@@ -2,6 +2,17 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.9.0] — 2026-11-23
+
+### Added
+- **v1.9 — otak BugHunter, tahap 1 dari "gas semuanya berurutan":**
+  - **22 skill baru (index 67 → 89):** hunt-aspnet, hunt-cicd, hunt-clickjacking, hunt-cloud-misconfig, hunt-exceptional-conditions, hunt-fintech-graphql, hunt-grpc, hunt-html-injection, hunt-k8s, hunt-laravel, hunt-ldap, hunt-nextjs, hunt-ntlm-info, hunt-rag-vector, hunt-shadow-api, hunt-source-leak, hunt-spa-api, hunt-springboot, hunt-subdomain, hunt-tls-network, hunt-brute-force, hunt-captcha-bypass. Semua ditulis ulang dengan kata sendiri (adaptasi Claude-BugHunter MIT/CC-BY-4.0) + blok "Scope & larangan" + Gate-0. **hunt-brute-force dan hunt-captcha-bypass hanya dalam bentuk deteksi kontrol-hilang** (amati ada/tidaknya 429/lockout/CAPTCHA dengan akun test sendiri; menebak kredensial/OTP dan alat solver DILARANG di dalam skill).
+  - **Pola bersitasi 85 → 124 (bersitasi 73 → 112, 21 skill):** 39 pola baru dari `docs/disclosed-reports/` upstream untuk 7 kelas yang tadinya kosong — hunt-idor 6, hunt-dom 6, hunt-jwt-crypto 5, hunt-mfa-bypass 5, hunt-cache-poison 5, hunt-http-smuggling 8, hunt-auth-bypass 4. Semua payout/tahun null (upstream tak menyebut tahun terverifikasi — tidak disalin). Satu ID (136169) tidak dihitung dua kali (sudah ada sebagai pola hunt-saml).
+  - **Pendalaman 8 skill Tier-1:** hunt-oauth, hunt-ato, hunt-session, hunt-sqli, hunt-xss, hunt-ssrf, hunt-idor, hunt-graphql — masing-masing + seksi "## Pendalaman" (5 pola deteksi + 1 chain + 1 catatan Gate-0), isi lama tidak diubah.
+  - **Perintah baru `bounty skills [--skill <nama>]`: ** daftar skill (tabel Skill/Kelas/CWE + total) atau tampilkan isi satu skill; tak dikenal → stderr + exit 2. Masuk COMMANDS (did-you-mean ikut mengenalinya).
+  - **Perbaikan UI/UX dari PR #1 (sudah merge ke main, 2026-11-23 20:14 WIB):** warning SQLite disaring (hanya ExperimentalWarning sqlite), help dikelompokkan per seksi + deskripsi run/review diperbaiki, `bounty programs` tanpa label rangkap, Scope DITOLAK ke stderr via `printScope`, did-you-mean untuk perintah tak dikenal, petunjuk langkah berikutnya seragam di graphql/cloud/reverse/firmware, `phaseLine` dipakai, `progressBar` hormati `width`.
+- **Batasan jujur v1.9.0:** 6 kelas tetap tanpa pola bersitasi (hunt-xss, hunt-nosqli, hunt-host-header, hunt-session, hunt-cors, hunt-websocket — upstream tidak menyebut ID H1 eksplisit untuk kelas-kelas itu); skill baru tetap ringkas (~40-70 baris, bukan 872 baris seperti upstream); pola baru hanya terverifikasi lewat sitasi upstream (bukan dibuka satu per satu di HackerOne, kecuali 3 spot-check lama); baseline live + oracle LLMVault tetap menunggu laptop Fahmi. Lanjut: v1.10 planner, v1.11 ingatan.
+
 ## [Unreleased]
 
 ### Fixed

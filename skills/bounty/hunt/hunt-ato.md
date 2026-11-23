@@ -41,3 +41,20 @@ Verifikasi kepemilikan akun (token, OTP, email) tidak mengikat ke identitas yang
 - Replay: akun test korban harus benar-benar berpindah tangan ke akun test penyerang.
 - Buktikan dengan dua akun test milikmu, bukan akun user nyata.
 - Simpan request/response, redaksi token/cookie.
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- Token reset tanpa kedaluwarsa / bisa dipakai ulang: minta dua token untuk akun test sendiri — pakai token pertama setelah token kedua terbit; bila masih valid, token lama tidak di-revoke.
+- Ganti password tanpa step-up: endpoint menerima password baru tanpa password lama dan tanpa MFA — uji dari sesi akun test; ini pengali persistensi (cookie curian + ini = ATO permanen).
+- Jawaban recovery sosial: jawaban ber-entropi rendah, atau jawabannya terpapar di `/api/me` / halaman recovery — uji dengan akun test sendiri, jangan tebak jawaban akun orang lain.
+- SSO subdomain takeover: provider menerima `redirect_uri` wildcard subdomain dan ada subdomain menganggur (CNAME ke layanan yang sudah dihapus) — konfirmasi = code benar-benar sampai di host yang kamu klaim, bukan sekadar redirect.
+- Pre-account takeover: akun masih pending / belum terverifikasi — uji alur invite dengan email milikmu; akun passwordless / magic-link yang memberi sesi hanya dari nomor atau email tanpa langkah token juga diuji dengan identitas milikmu.
+
+### Chain tambahan
+Curi cookie sesi → ganti password tanpa step-up → kunci pemilik asli keluar, ATO permanen dari perangkat mana pun.
+
+### Catatan Gate-0 tambahan
+- Nilai severity: kritis hanya bila tanpa interaksi korban (reset poisoning, token palsu, `redirect_uri` longgar); butuh satu klik email = high; butuh phishing aktif = medium.
+- Validasi end-to-end: sesi akun test B harus benar-benar berpindah tangan — decoding atau membuat token saja bukan dampak.

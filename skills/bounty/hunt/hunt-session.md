@@ -42,3 +42,20 @@ Siklus hidup session tidak dikelola: ID tidak di-rotasi saat login, tidak di-rev
 - Replay dengan session akun test sendiri; session akun low-priv harus gagal setelah logout.
 - Buktikan dengan dua akun test milikmu, bukan akun user nyata.
 - Simpan request/response, redaksi token/cookie.
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- Atribut cookie: tanpa prefix `__Host-` / `__Secure-` berarti sesi bisa ditimpa dari subdomain atau konteks non-aman — ini syarat awal fixation; `HttpOnly` yang hilang hanya dihitung bila dirantai ke XSS nyata; `SameSite` yang hilang berarti jangkauan CSRF.
+- Entropi session ID: kumpulkan 200+ ID segar, cek duplikat (duplikat = katastrofal), decode struktur (userId / timestamp / PID di dalam ID) — 10 sampel terlalu sedikit untuk klaim apa pun.
+- JWT sebagai sesi: klaim `exp` hilang atau `jti` hilang berarti server tidak bisa memelihara daftar revoke — uji logout lalu replay JWT yang sama ke `/api/me`; bila masih 200, token tidak bisa dicabut.
+- Refresh token: rotasi tanpa reuse-detection — replay refresh token lama; bila masih bisa menukar token baru, atau token hasil rotasi tetap hidup setelah replay, keluarga token tidak dicabut.
+- SSO linkage: logout di IdP saja, lalu replay cookie aplikasi — bila masih 200, sesi aplikasi hidup lebih lama dari sesi IdP (celah single-logout).
+
+### Chain tambahan
+Fixation (ID tidak di-rotasi saat login) + refresh token tanpa rotasi → sesi curian hidup permanen melewati ganti password.
+
+### Catatan Gate-0 tambahan
+- Ukur, jangan kira-kira: klaim "bisa ditebak" wajib dari sampel besar + decode struktur, bukan dari panjang karakter — token pendek ber-entropi tinggi bisa saja aman.
+- Token yang terlihat acak bukan bukti kuat; hanya decode struktur + estimasi entropi sampel besar yang dihitung.

@@ -959,5 +959,304 @@
       "assume role"
     ],
     "when": "Program mencantumkan cloud (AWS/Azure/GCP) dalam scope."
+  },
+  {
+    "name": "hunt-aspnet",
+    "file": "hunt/hunt-aspnet.md",
+    "vuln_class": "ASP.NET Misconfiguration",
+    "cwe": "CWE-200",
+    "keywords": [
+      "aspnet",
+      "viewstate",
+      "aspx",
+      "iis",
+      "dotnet"
+    ],
+    "when": "Target ASP.NET/IIS dengan ViewState, trace, atau handler lama."
+  },
+  {
+    "name": "hunt-cicd",
+    "file": "hunt/hunt-cicd.md",
+    "vuln_class": "CI/CD Pipeline Abuse",
+    "cwe": "CWE-829",
+    "keywords": [
+      "cicd",
+      "jenkins",
+      "github actions",
+      "runner",
+      "pipeline"
+    ],
+    "when": "Pipeline CI/CD terekspos atau workflow memakai input tak tepercaya."
+  },
+  {
+    "name": "hunt-clickjacking",
+    "file": "hunt/hunt-clickjacking.md",
+    "vuln_class": "Clickjacking",
+    "cwe": "CWE-1021",
+    "keywords": [
+      "clickjacking",
+      "iframe",
+      "x-frame-options",
+      "frame-ancestors"
+    ],
+    "when": "Halaman sensitif bisa di-frame tanpa X-Frame-Options/CSP."
+  },
+  {
+    "name": "hunt-cloud-misconfig",
+    "file": "hunt/hunt-cloud-misconfig.md",
+    "vuln_class": "Cloud Misconfiguration",
+    "cwe": "CWE-200",
+    "keywords": [
+      "cloud",
+      "s3",
+      "bucket",
+      "firebase",
+      "storage"
+    ],
+    "when": "Bucket/storage cloud atau panel admin cloud terekspos publik."
+  },
+  {
+    "name": "hunt-exceptional-conditions",
+    "file": "hunt/hunt-exceptional-conditions.md",
+    "vuln_class": "Error Message Disclosure",
+    "cwe": "CWE-209",
+    "keywords": [
+      "error",
+      "stack trace",
+      "exception",
+      "verbose",
+      "debug"
+    ],
+    "when": "Input cacat memicu pesan error/stack trace yang membocorkan info."
+  },
+  {
+    "name": "hunt-fintech-graphql",
+    "file": "hunt/hunt-fintech-graphql.md",
+    "vuln_class": "Fintech GraphQL Logic Flaw",
+    "cwe": "CWE-840",
+    "keywords": [
+      "fintech",
+      "ledger",
+      "transfer",
+      "graphql",
+      "payment"
+    ],
+    "when": "GraphQL di depan ledger/dompet/pembayaran dengan mutasi uang."
+  },
+  {
+    "name": "hunt-grpc",
+    "file": "hunt/hunt-grpc.md",
+    "vuln_class": "gRPC Abuse",
+    "cwe": "CWE-400",
+    "keywords": [
+      "grpc",
+      "protobuf",
+      "reflection",
+      "rpc"
+    ],
+    "when": "Endpoint gRPC dengan reflection aktif atau auth per-method hilang."
+  },
+  {
+    "name": "hunt-html-injection",
+    "file": "hunt/hunt-html-injection.md",
+    "vuln_class": "HTML Injection",
+    "cwe": "CWE-79",
+    "keywords": [
+      "html injection",
+      "markup",
+      "injection",
+      "email"
+    ],
+    "when": "Input ditampilkan sebagai markup tanpa penyandian (bukan eksekusi JS)."
+  },
+  {
+    "name": "hunt-k8s",
+    "file": "hunt/hunt-k8s.md",
+    "vuln_class": "Kubernetes Misconfiguration",
+    "cwe": "CWE-200",
+    "keywords": [
+      "kubernetes",
+      "k8s",
+      "kubelet",
+      "etcd",
+      "api server"
+    ],
+    "when": "API Kubernetes/kubelet terekspos tanpa auth yang benar."
+  },
+  {
+    "name": "hunt-laravel",
+    "file": "hunt/hunt-laravel.md",
+    "vuln_class": "Laravel Debug Exposure",
+    "cwe": "CWE-215",
+    "keywords": [
+      "laravel",
+      "php",
+      "debug",
+      "whoops",
+      "env"
+    ],
+    "when": "Aplikasi Laravel dengan mode debug atau file .env terekspos."
+  },
+  {
+    "name": "hunt-ldap",
+    "file": "hunt/hunt-ldap.md",
+    "vuln_class": "LDAP Injection",
+    "cwe": "CWE-90",
+    "keywords": [
+      "ldap",
+      "directory",
+      "injection",
+      "filter"
+    ],
+    "when": "Filter LDAP dibangun dari input tanpa penyandian."
+  },
+  {
+    "name": "hunt-nextjs",
+    "file": "hunt/hunt-nextjs.md",
+    "vuln_class": "Next.js Misconfiguration",
+    "cwe": "CWE-200",
+    "keywords": [
+      "nextjs",
+      "server actions",
+      "_next",
+      "react"
+    ],
+    "when": "Aplikasi Next.js dengan Server Actions/middleware yang bisa dilewati."
+  },
+  {
+    "name": "hunt-ntlm-info",
+    "file": "hunt/hunt-ntlm-info.md",
+    "vuln_class": "NTLM Information Disclosure",
+    "cwe": "CWE-200",
+    "keywords": [
+      "ntlm",
+      "windows",
+      "active directory",
+      "auth"
+    ],
+    "when": "Endpoint Windows/AD membocorkan info domain lewat challenge NTLM."
+  },
+  {
+    "name": "hunt-rag-vector",
+    "file": "hunt/hunt-rag-vector.md",
+    "vuln_class": "RAG/Vector DB Exposure",
+    "cwe": "CWE-200",
+    "keywords": [
+      "rag",
+      "vector",
+      "embedding",
+      "llm",
+      "retrieval"
+    ],
+    "when": "Vector DB / RAG tanpa auth atau IDOR lintas tenant."
+  },
+  {
+    "name": "hunt-shadow-api",
+    "file": "hunt/hunt-shadow-api.md",
+    "vuln_class": "Shadow API",
+    "cwe": "CWE-200",
+    "keywords": [
+      "shadow api",
+      "undocumented",
+      "zombie",
+      "api version"
+    ],
+    "when": "Ada versi/endpoint API lama yang tidak terdokumentasi tapi masih aktif."
+  },
+  {
+    "name": "hunt-source-leak",
+    "file": "hunt/hunt-source-leak.md",
+    "vuln_class": "Source Code Disclosure",
+    "cwe": "CWE-540",
+    "keywords": [
+      "source leak",
+      ".env",
+      ".git",
+      "sourcemap",
+      "swagger"
+    ],
+    "when": "File .env/.git/source map/Swagger terekspos di server."
+  },
+  {
+    "name": "hunt-spa-api",
+    "file": "hunt/hunt-spa-api.md",
+    "vuln_class": "SPA API Exposure",
+    "cwe": "CWE-200",
+    "keywords": [
+      "spa",
+      "bundle",
+      "api",
+      "javascript",
+      "chunk"
+    ],
+    "when": "Rute API dipanen dari bundle SPA dan bisa diakses tanpa auth."
+  },
+  {
+    "name": "hunt-springboot",
+    "file": "hunt/hunt-springboot.md",
+    "vuln_class": "Spring Boot Actuator Exposure",
+    "cwe": "CWE-200",
+    "keywords": [
+      "springboot",
+      "actuator",
+      "java",
+      "heapdump",
+      "env"
+    ],
+    "when": "Actuator Spring Boot (env/mappings/heapdump) terekspos."
+  },
+  {
+    "name": "hunt-subdomain",
+    "file": "hunt/hunt-subdomain.md",
+    "vuln_class": "Subdomain Takeover",
+    "cwe": "CWE-200",
+    "keywords": [
+      "subdomain",
+      "takeover",
+      "cname",
+      "dangling",
+      "dns"
+    ],
+    "when": "Subdomain menunjuk ke layanan yang sudah tidak diklaim."
+  },
+  {
+    "name": "hunt-tls-network",
+    "file": "hunt/hunt-tls-network.md",
+    "vuln_class": "TLS/Network Misconfiguration",
+    "cwe": "CWE-295",
+    "keywords": [
+      "tls",
+      "ssl",
+      "certificate",
+      "dmarc",
+      "dns"
+    ],
+    "when": "TLS/DNS/DMARC salah konfigurasi hingga spoof atau intersepsi mungkin."
+  },
+  {
+    "name": "hunt-brute-force",
+    "file": "hunt/hunt-brute-force.md",
+    "vuln_class": "Missing Brute-Force Protection",
+    "cwe": "CWE-307",
+    "keywords": [
+      "brute force",
+      "rate limit",
+      "lockout",
+      "login attempts"
+    ],
+    "when": "Deteksi saja: endpoint login tanpa 429/lockout/CAPTCHA. Menebak kredensial DILARANG."
+  },
+  {
+    "name": "hunt-captcha-bypass",
+    "file": "hunt/hunt-captcha-bypass.md",
+    "vuln_class": "Missing CAPTCHA Enforcement",
+    "cwe": "CWE-307",
+    "keywords": [
+      "captcha",
+      "bot",
+      "automation",
+      "verification"
+    ],
+    "when": "Deteksi saja: form tanpa penegakan CAPTCHA. Bypass/solver DILARANG."
   }
 ]

@@ -56,7 +56,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.8.0";
+export const VERSION = "1.9.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -161,6 +161,8 @@ MEMORI, GRAF & POLA
       Graf aset (view SQL): node/edge, aset terpanas, cakupan open.
   bounty patterns [--skill <nama>]
       Pustaka pola laporan: total, bersitasi, per skill (+ bonus router).
+  bounty skills [--skill <nama>]
+      Daftar skill hunt di skills-index.json; --skill tampilkan isi skill.
 
 GERBANG CI & BENCHMARK
   bounty promptfoo-gate --results <hasil.json> [--min-pass-rate 0.8]
@@ -1273,6 +1275,38 @@ function cmdPatterns(args) {
   return 0;
 }
 
+function loadSkillsIndex() {
+  const candidates = [
+    resolve(SKILLS_DIR, "skills-index.json"),
+    resolve(process.cwd(), "skills/bounty/skills-index.json"),
+    resolve(REPO_ROOT, "skills/bounty/skills-index.json"),
+  ];
+  for (const p of candidates) {
+    try { return JSON.parse(readFileSync(p, "utf8")); } catch { /* coba berikut */ }
+  }
+  return null;
+}
+
+function cmdSkills(args) {
+  const index = loadSkillsIndex();
+  if (!index) { console.error("skills-index.json tidak ditemukan."); return 2; }
+  const name = args.skill ? String(args.skill) : "";
+  if (name) {
+    const entry = index.find((e) => e.name === name);
+    if (!entry) { console.error(`Skill tidak ditemukan: ${name}`); return 2; }
+    let text;
+    try { text = readFileSync(resolve(SKILLS_DIR, entry.file), "utf8"); }
+    catch { console.error(`File skill tidak bisa dibaca: ${entry.file}`); return 2; }
+    process.stdout.write(text);
+    if (!text.endsWith("\n")) console.log();
+    return 0;
+  }
+  const rows = index.map((e) => [e.name, e.vuln_class || "-", e.cwe || "-"]);
+  console.log(table(rows, ["Skill", "Kelas", "CWE"]));
+  console.log(`Total: ${index.length} skill.`);
+  return 0;
+}
+
 async function cmdBench(args) {
   // Per spec: bench memanggil lib/bench.js (runBench + scoreFindings).
   // Oracle dibaca dari eval/oracle/labels/*.json bila ada; runFn mock
@@ -1322,7 +1356,7 @@ function cmdInstall(args) {
 const COMMANDS = [
   "provider", "run", "view", "review", "programs", "findings", "memory",
   "graph", "trace", "report", "bench", "scan", "recon", "oast", "platform",
-  "patterns", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
+  "patterns", "skills", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
   "firmware", "promptfoo-gate", "graph-gate", "install",
 ];
 
@@ -1374,6 +1408,7 @@ export async function main(argv = process.argv.slice(2)) {
     case "oast": return await cmdOast(args);
     case "platform": return await cmdPlatform(args);
     case "patterns": return cmdPatterns(args);
+    case "skills": return cmdSkills(args);
     case "dedup": return cmdDedup(args);
     case "codesearch": return cmdCodesearch(args);
     case "graphql": return await cmdGraphql(args);

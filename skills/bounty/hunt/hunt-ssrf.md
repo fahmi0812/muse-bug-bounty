@@ -29,3 +29,20 @@ SSRF → baca layanan internal → baca metadata / endpoint admin internal
   callback ke server log milikmu / respons berisi data internal).
 - Replay dengan URL normal harus tetap berfungsi.
 - Jangan ambil atau pakai kredensial cloud yang terbaca.
+
+## Pendalaman
+Diadaptasi dari Claude-BugHunter (MIT/CC-BY-4.0) — parafrase, fokus deteksi + validasi.
+
+### Pola deteksi tambahan
+- Aturan OOB: callback harus dikaitkan ke SATU parameter — bila beberapa parameter memakai URL yang sama, isolasi satu per satu sebelum mengklaim.
+- Blind vs full-read: minta server mengambil URL dengan isi yang dikenal — isi kembali = full-read; hanya callback tanpa isi = blind (skor dan langkahnya berbeda).
+- Metadata per provider: GCP (`metadata.google.internal`), Azure (butuh header `Metadata: true`), Kubernetes (service account) — uji hanya baca metadata di lab, jangan ambil kredensial.
+- Redirect SSRF: server redirect milikmu mengarah ke target internal — uji apakah server mengikuti redirect ke host internal.
+- Port layanan internal: kubelet / etcd / Redis / Elasticsearch / Consul — respons berbeda per port menandai layanan; uji dengan timing + banner, jangan kirim perintah.
+
+### Chain tambahan
+SSRF blind + callback OOB → konfirmasi server-side → petakan port internal → baca metadata (berhenti sebelum kredensial).
+
+### Catatan Gate-0 tambahan
+- Callback harus datang dari server target (interactsh), bukan dari browsermu; URL penyerang yang hanya terpantul di respons bukan SSRF.
+- Buktikan server yang melakukan request, bukan browsermu — lewat callback ke server log milikmu atau respons berisi data internal.
