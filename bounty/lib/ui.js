@@ -2,6 +2,12 @@
 // Murni format teks, tanpa I/O dan tanpa process.exit. Warna mati bila
 // env NO_COLOR ada (nilai apa pun) atau BOUNTY_NO_COLOR=1, kecuali opts.color memaksa.
 const ANSI = { red: 31, green: 32, yellow: 33, cyan: 36, dim: 2, bold: 1 };
+// Kode SGR ANSI (mis. \x1b[31m ... \x1b[0m) untuk menghitung lebar tampak.
+const ANSI_SGR_RE = /\x1b\[[0-9;]*m/g;
+/** Panjang teks yang benar-benar terlihat (tanpa kode warna ANSI). */
+function visibleLength(text) {
+  return String(text).replace(ANSI_SGR_RE, "").length;
+}
 
 /** Apakah warna ANSI boleh dipakai. opts.color true memaksa nyala, false memaksa mati. */
 export function colorsEnabled(opts = {}) {
@@ -57,12 +63,17 @@ export function table(rows, headers, opts = {}) {
   if (data.length === 0) return "";
   const all = head.length > 0 ? [head, ...data] : data;
   const cols = Math.max(...all.map((r) => r.length));
+  // Lebar kolom dihitung dari panjang TAMPAK (tanpa kode ANSI), supaya
+  // sel berwarna (mis. badge severity) tidak menggeser kolom berikutnya.
   const widths = Array.from({ length: cols }, (_, i) =>
-    Math.max(...all.map((r) => String(r[i] ?? "").length)),
+    Math.max(...all.map((r) => visibleLength(r[i] ?? ""))),
   );
   const paint = colorsEnabled(opts);
   const lines = all.map((row, idx) => {
-    const cells = Array.from({ length: cols }, (_, i) => String(row[i] ?? "").padEnd(widths[i]));
+    const cells = Array.from({ length: cols }, (_, i) => {
+      const cell = String(row[i] ?? "");
+      return cell + " ".repeat(Math.max(0, widths[i] - visibleLength(cell)));
+    });
     const line = cells.join("  ").replace(/\s+$/, "");
     return idx === 0 && head.length > 0 && paint ? `\x1b[1m${line}\x1b[0m` : line;
   });

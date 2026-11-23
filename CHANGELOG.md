@@ -13,6 +13,9 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
   - **Perintah tak dikenal:** kini memberi saran "Maksud Anda ...?" (jarak edit) + daftar perintah singkat ke stderr, bukan membuang seluruh teks help.
   - **Petunjuk langkah berikutnya seragam:** `graphql`/`cloud`/`reverse`/`firmware` kini ikut menampilkan `Lihat antrean: bounty review | bounty findings` saat ada kandidat baru.
   - **`phaseLine` dipakai** di baris budget `bounty run` (sebelumnya helper ini tak terpakai di CLI); `progressBar` menghormati parameter `width` saat `total <= 0`.
+  - **Bug: `bounty run` tunggal yang ditolak scope gate exit 0 (bukan 2).** `runSingleTarget` mengembalikan angka telanjang `2` di jalur scope-ditolak, sedangkan `cmdRun` membaca `r.code` → `undefined` → exit 0. Kini mengembalikan bentuk hasil `{code,...}` yang benar sehingga target di luar scope exit 2 (gate gagal = gagal, bukan sukses diam-diam).
+  - **Bug: `bounty graph-gate` melempar `ReferenceError` tiap jalan (ditelan try/catch).** `listCoverage` dipakai tapi tidak di-import, jadi statistik `openCoverage`/`totalFindings`/`untracedFindings` tidak pernah terisi dan 3 dari 4 sinyal gate diabaikan diam-diam. Import diperbaiki.
+  - **Bug: tabel `findings`/`review` tidak sejajar di terminal berwarna.** `table()` menghitung lebar kolom dari panjang string mentah termasuk kode ANSI, sehingga sel berwarna (badge severity) menggeser kolom berikutnya. Lebar kini dihitung dari panjang tampak (kode ANSI diabaikan); output pipe/non-warna tidak berubah.
 
 ## [1.8.0] — 2026-11-23
 
