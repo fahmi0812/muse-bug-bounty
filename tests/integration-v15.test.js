@@ -59,10 +59,10 @@ test("v1.5 e2e: oast poll tanpa sesi -> exit 2; platform draft id tidak ada -> e
   assert.match(r2.stdout + r2.stderr, /tidak ditemukan/);
 });
 
-test("v1.5 e2e: patterns tampilkan 136 total 124 bersitasi (naik di v1.9)", () => {
+test("v1.5 e2e: patterns tampilkan 151 total 139 bersitasi (naik di v1.9)", () => {
   const r = runCli(["patterns"]);
   assert.equal(r.status, 0, r.stderr + r.stdout);
-  assert.match(r.stdout, /136 total, 124 bersitasi/);
+  assert.match(r.stdout, /151 total, 139 bersitasi/);
   const r2 = runCli(["patterns", "--skill", "hunt-ato"]);
   assert.equal(r2.status, 0, r2.stderr + r2.stdout);
   assert.match(r2.stdout, /7 bersitasi/);

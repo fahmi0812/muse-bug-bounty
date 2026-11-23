@@ -1618,5 +1618,170 @@
     "subclass": "CSRF token leaked cross-origin via data-method link handler (HackerOne)",
     "tahun": 2015,
     "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-79",
+    "h1_report_id": "1147433",
+    "link": "https://hackerone.com/reports/1147433",
+    "payout": 5300,
+    "skill": "hunt-xss",
+    "subclass": "Stored XSS via rich-text HTML editor in product and collection descriptions (Shopify, $5,300)",
+    "tahun": 2021,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-79",
+    "h1_report_id": "130591",
+    "link": "https://hackerone.com/reports/130591",
+    "payout": null,
+    "skill": "hunt-xss",
+    "subclass": "Stored XSS via SVG upload (Moneybird)",
+    "tahun": 2016,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-79",
+    "h1_report_id": "550266",
+    "link": "https://hackerone.com/reports/550266",
+    "payout": null,
+    "skill": "hunt-xss",
+    "subclass": "Stored XSS via X-Forwarded-Host header combined with web cache poisoning (ok.ru)",
+    "tahun": 2019,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-943",
+    "h1_report_id": "1447619",
+    "link": "https://hackerone.com/reports/1447619",
+    "payout": null,
+    "skill": "hunt-nosqli",
+    "subclass": "Authentication bypass via NoSQL injection with $exists operator on login token (Rocket.Chat)",
+    "tahun": 2022,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-601",
+    "h1_report_id": "281575",
+    "link": "https://hackerone.com/reports/281575",
+    "payout": null,
+    "skill": "hunt-host-header",
+    "subclass": "Password reset poisoning via Host header (Mavenlink, bounty hidden)",
+    "tahun": 2017,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-601",
+    "h1_report_id": "137181",
+    "link": "https://hackerone.com/reports/137181",
+    "payout": null,
+    "skill": "hunt-host-header",
+    "subclass": "Open redirect and cache poisoning via trusted Host header (ThisData, no bounty shown)",
+    "tahun": 2016,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-601",
+    "h1_report_id": "1444675",
+    "link": "https://hackerone.com/reports/1444675",
+    "payout": 300,
+    "skill": "hunt-host-header",
+    "subclass": "Open redirect and content spoofing via crafted X-Forwarded-Host header (Omise, $300)",
+    "tahun": 2022,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-384",
+    "h1_report_id": "423136",
+    "link": "https://hackerone.com/reports/423136",
+    "payout": 5000,
+    "skill": "hunt-session",
+    "subclass": "Session fixation via unchanged session ID after OAuth login across Shopify apps (Shopify, $5000)",
+    "tahun": 2018,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-613",
+    "h1_report_id": "263873",
+    "link": "https://hackerone.com/reports/263873",
+    "payout": null,
+    "skill": "hunt-session",
+    "subclass": "Session cookie reusable after logout due to missing server-side expiration (GSA Bounty, no bounty)",
+    "tahun": 2017,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-942",
+    "h1_report_id": "1530581",
+    "link": "https://hackerone.com/reports/1530581",
+    "payout": null,
+    "skill": "hunt-cors",
+    "subclass": "CORS misconfiguration on a U.S. Dept Of Defense site exposes sensitive data to cross-origin pages (U.S. Dept Of Defense)",
+    "tahun": 2022,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-942",
+    "h1_report_id": "372452",
+    "link": "https://hackerone.com/reports/372452",
+    "payout": null,
+    "skill": "hunt-cors",
+    "subclass": "CORS misconfiguration on Infogram's websocket host lets any site read cross-origin responses (Infogram)",
+    "tahun": 2018,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-942",
+    "h1_report_id": "924951",
+    "link": "https://hackerone.com/reports/924951",
+    "payout": null,
+    "skill": "hunt-cors",
+    "subclass": "CORS misconfiguration in LY Corporation's StudyRoom API lets a malicious page read a victim's profile PII (LY Corporation)",
+    "tahun": 2020,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-1385",
+    "h1_report_id": "931197",
+    "link": "https://hackerone.com/reports/931197",
+    "payout": null,
+    "skill": "hunt-websocket",
+    "subclass": "Socket.IO origin check bypass with backtick and dollar characters lets an attacker's site send and receive WebSocket messages as the victim (Node.js third-party modules)",
+    "tahun": 2020,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-1385",
+    "h1_report_id": "3917775",
+    "link": "https://hackerone.com/reports/3917775",
+    "payout": null,
+    "skill": "hunt-websocket",
+    "subclass": "Missing Sec-WebSocket-Accept verification in curl lets a man-in-the-middle hijack WebSocket sessions (curl)",
+    "tahun": 2026,
+    "uncited": false
+  },
+  {
+    "cve": null,
+    "cwe": "CWE-1385",
+    "h1_report_id": "1274695",
+    "link": "https://hackerone.com/reports/1274695",
+    "payout": null,
+    "skill": "hunt-websocket",
+    "subclass": "Burp Suite's remote-debugging WebSocket endpoint had no auth token, letting a malicious page steal its session GUID and trigger remote code execution (PortSwigger Web Security)",
+    "tahun": 2021,
+    "uncited": false
   }
 ]
