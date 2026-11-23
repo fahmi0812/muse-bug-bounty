@@ -186,12 +186,26 @@ export async function runBench({ runs = RUNS } = {}) {
   // Akurasi router (plan v3.1 #7): untuk tiap lab, apakah top-5 skill
   // yang di-route mengandung hunt-<kelas> yang sesuai dengan oracle.
   // Hit rate, bukan latensi — latensi tidak membuktikan pilihan benar.
+  // v1.2 (M2): router memakai lesson dari store + pola bersitasi bila ada.
   let routerAccuracy = null;
   if (lib.bench?.routerAccuracy) {
     routerAccuracy = {};
+    let routeFn = null;
+    try {
+      const { Store } = await import('../bounty/lib/store.js');
+      const { routeWithLessons } = await import('../bounty/lib/router.js');
+      const { listLessons } = await import('../bounty/lib/memory.js');
+      const { loadPatterns } = await import('../bounty/lib/patterns.js');
+      const store = new Store();
+      try {
+        const lessons = listLessons(store.db);
+        const patterns = loadPatterns();
+        routeFn = (ctx) => routeWithLessons(ctx, lessons, patterns);
+      } finally { store.close(); }
+    } catch { routeFn = null; }
     for (const l of labs) {
       const oracle = JSON.parse(readFileSync(join(LABELS_DIR, `${l.lab}.json`), 'utf8'));
-      const acc = lib.bench.routerAccuracy(oracle.vulns ?? []);
+      const acc = lib.bench.routerAccuracy(oracle.vulns ?? [], routeFn);
       routerAccuracy[l.lab] = { hit: acc.hit, total: acc.total, accuracy: acc.accuracy };
     }
   }

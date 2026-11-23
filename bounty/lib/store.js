@@ -3,6 +3,8 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync, chmodSync, existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { ensureMemorySchema } from "./memory.js";
+import { ensureGraphViews } from "./graph.js";
 
 export const DEFAULT_DB_PATH = resolve(process.cwd(), ".bounty", "bounty.db");
 
@@ -81,6 +83,11 @@ export class Store {
     try { chmodSync(dir, 0o700); } catch {}
     this.db = new DatabaseSync(this.path);
     this.db.exec(SCHEMA);
+    // v1.2: memori (M0/M1) + graf sebagai view (M3) hidup di store yang
+    // sama — tanpa server baru. Idempotent; gagal di sini = store rusak,
+    // jadi jangan ditelan diam-diam.
+    ensureMemorySchema(this.db);
+    ensureGraphViews(this.db);
     try { chmodSync(this.path, 0o600); } catch {}
   }
 

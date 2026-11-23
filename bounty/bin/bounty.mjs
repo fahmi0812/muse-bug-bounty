@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
-// Commands: provider | run | review | report | bench | install | programs | findings | scan | --help | --version
+// Commands: provider | run | review | report | bench | install | programs | findings | scan | memory | graph | trace | --help | --version
 import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -18,9 +18,14 @@ import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates } from "../lib/dedup.js";
 import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
+import { recordEpisode, listEpisodes, listLessons, addLesson, findSimilar, recordCoverage } from "../lib/memory.js";
+import { listNodes, listEdges, traceFinding } from "../lib/graph.js";
+import { routeWithLessons } from "../lib/router.js";
+import { loadPatterns } from "../lib/patterns.js";
+import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
-export const VERSION = "0.1.0";
+export const VERSION = "1.2.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -41,8 +46,15 @@ Penggunaan:
   bounty review [--queue] [--approve <id> | --reject <id>] [--export-html [FILE]]
   bounty programs
       List program di programs/*.md (nama, scope, budget, rate).
-  bounty findings [--program <nama>]
+  bounty findings [--program <nama>] [--similar <id>]
       List kandidat + finding tersimpan, opsional filter program.
+      --similar <id>: temuan serupa dari memori (FTS5 + RRF).
+  bounty memory [--list] [--lessons] [--program <nama>]
+      Episode memori per run/review + lesson dari verdict manusia.
+  bounty graph [--program <nama>]
+      Graf aset (view SQL): node/edge, aset terpanas, cakupan open.
+  bounty trace <finding-id>
+      Jejak source -> sink dari chain + evidence yang tercatat.
       List kandidat (status candidate); approve/reject per id.
       --queue: tampilkan antrean kandidat. --export-html: tulis halaman
       review statis (default eval/review.html) untuk review manual.
@@ -255,6 +267,18 @@ async function cmdRun(args) {
       store.addRun({ version: "bounty", target, lab: program.name, tp: 0, fp: 0, fn: 0, timeMs: Date.now() - startedAt, usd });
       console.log(`\nHasil parse: ${findings.length} temuan dari output Strix, ${added} kandidat baru masuk store (dedup: ${findings.length - added} duplikat). Biaya terukur: $${usd}.`);
       console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
+      // v1.2 memori: episode per run + coverage kelas yang diperiksa +
+      // peringatan bila pola serupa pernah ditolak (FP) oleh reviewer.
+      try {
+        for (const f of fresh) recordCoverage(store.db, program.name, f.endpoint, f.vulnClass, "examined");
+        const rejectedIds = new Set(store.listCandidates(program.name, "rejected").map((c) => c.id));
+        for (const f of fresh) {
+          const similar = findSimilar(store.db, { endpoint: f.endpoint, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe }, 3)
+            .filter((s) => rejectedIds.has(s.id));
+          if (similar.length > 0) console.log(`Peringatan: pola serupa pernah DITOLAK (FP) — kandidat #${similar[0].id} ${similar[0].endpoint} (${similar[0].vulnClass}). Verifikasi ekstra sebelum approve.`);
+        }
+        recordEpisode(store.db, { program: program.name, target, kind: "run", summary: `${added} kandidat baru, ${findings.length} temuan parse, $${usd}` });
+      } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); }
     } finally { store.close(); }
   } catch (e) { console.error(`Peringatan: gagal menyimpan hasil ke store: ${e.message}`); }
   return done(strixOk ? 0 : code, strixOk ? (code === 2 ? "ok-findings" : "ok") : "failed");
@@ -268,12 +292,14 @@ function cmdReview(args) {
       const row = store.approveCandidate(Number(args.approve));
       console.log(row ? `Kandidat #${row.id} disetujui (approved).` : `Kandidat #${args.approve} tidak ditemukan.`);
       auditLog(row ? "ok" : "error", `#${args.approve}`);
+      if (row) { try { addLesson(store.db, { skill: expectedSkillFor(row.vuln_class), vulnClass: row.vuln_class, outcome: "confirmed", note: `review approve #${row.id}` }); recordEpisode(store.db, { program: row.program, target: row.endpoint, kind: "review", summary: `approve #${row.id} ${row.vuln_class}` }); } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); } }
       return row ? 0 : 2;
     }
     if (args.reject) {
       const row = store.rejectCandidate(Number(args.reject));
       console.log(row ? `Kandidat #${row.id} ditolak (rejected).` : `Kandidat #${args.reject} tidak ditemukan.`);
       auditLog(row ? "ok" : "error", `#${args.reject}`);
+      if (row) { try { addLesson(store.db, { skill: expectedSkillFor(row.vuln_class), vulnClass: row.vuln_class, outcome: "false_positive", note: `review reject #${row.id}` }); recordEpisode(store.db, { program: row.program, target: row.endpoint, kind: "review", summary: `reject #${row.id} ${row.vuln_class} (FP)` }); } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); } }
       return row ? 0 : 2;
     }
     // --export-html [FILE]: halaman review statis (P1-2), default eval/review.html.
@@ -325,6 +351,17 @@ function cmdPrograms() {
 function cmdFindings(args) {
   const store = new Store();
   try {
+    // --similar <id>: temuan serupa dari memori (FTS5 + RRF, v1.2 M1).
+    if (args.similar) {
+      const row = store.db.prepare("SELECT * FROM candidate WHERE id = ?").get(Number(args.similar));
+      if (!row) { console.log(`Kandidat #${args.similar} tidak ditemukan.`); return 2; }
+      console.log(`Serupa dengan #${row.id} ${row.method} ${row.endpoint} (${row.vuln_class}):`);
+      const similar = findSimilar(store.db, { endpoint: row.endpoint, param: row.param, vulnClass: row.vuln_class, cwe: row.cwe }, 5)
+        .filter((s) => s.id !== row.id);
+      if (similar.length === 0) { console.log("  (tidak ada yang serupa di store)"); return 0; }
+      for (const s of similar) console.log(`  #${s.id} skor=${s.score.toFixed(2)} ${s.endpoint} (${s.vulnClass})`);
+      return 0;
+    }
     const program = args.program || null;
     const candidates = store.listCandidates(program, "candidate");
     const approved = store.listCandidates(program, "approved");
@@ -332,6 +369,80 @@ function cmdFindings(args) {
     if (rows.length === 0) { console.log(program ? `Tidak ada temuan untuk program ${program}.` : "Tidak ada temuan tersimpan."); return 0; }
     console.log("Temuan tersimpan:");
     for (const c of rows) console.log(`  #${c.id} [${c.status}] [${c.program}] ${c.method} ${c.endpoint} param=${c.param || "-"} kelas=${c.vuln_class} cwe=${c.cwe || "-"}`);
+    return 0;
+  } finally { store.close(); }
+}
+
+function cmdMemory(args) {
+  const store = new Store();
+  try {
+    if (args.lessons) {
+      const lessons = listLessons(store.db);
+      if (lessons.length === 0) { console.log("Belum ada lesson dari verdict reviewer."); return 0; }
+      console.log("Lesson (hanya dari verdict manusia):");
+      for (const l of lessons) console.log(`  ${l.skill} [${l.vuln_class}] ${l.outcome}${l.note ? ` — ${l.note}` : ""}`);
+      return 0;
+    }
+    const episodes = listEpisodes(store.db, args.program || null);
+    if (episodes.length === 0) { console.log("Belum ada episode memori."); return 0; }
+    console.log("Episode memori:");
+    for (const e of episodes) console.log(`  #${e.id} [${e.kind}] [${e.program}] ${e.target} — ${e.summary} (${e.created_at})`);
+    return 0;
+  } finally { store.close(); }
+}
+
+function cmdGraph(args) {
+  const store = new Store();
+  try {
+    const program = args.program || null;
+    const nodes = listNodes(store.db, program);
+    const edges = listEdges(store.db, program);
+    const kinds = {};
+    for (const n of nodes) kinds[n.kind] = (kinds[n.kind] || 0) + 1;
+    console.log(`Graf${program ? ` [${program}]` : ""}: ${nodes.length} node (${Object.entries(kinds).map(([k, v]) => `${k}=${v}`).join(", ") || "-"}) | ${edges.length} edge`);
+    const hot = store.db.prepare("SELECT * FROM v_hot_asset LIMIT 5").all();
+    if (hot.length > 0) {
+      console.log("Aset terpanas:");
+      for (const h of hot) console.log(`  ${h.host} [${h.program}] — ${h.finding_count} temuan, ${h.candidate_count ?? 0} kandidat`);
+    } else {
+      // Tabel asset hampir tidak pernah terisi — fallback: program dengan
+      // kandidat terbanyak, supaya graf tidak tampil kosong setelah run.
+      const top = store.db.prepare("SELECT program, COUNT(*) AS n FROM candidate GROUP BY program ORDER BY n DESC LIMIT 5").all();
+      if (top.length > 0) {
+        console.log("Program dengan kandidat terbanyak:");
+        for (const t of top) console.log(`  [${t.program}] — ${t.n} kandidat`);
+      }
+    }
+    const open = store.db.prepare("SELECT * FROM v_coverage WHERE status = 'open' LIMIT 20").all();
+    if (open.length > 0) {
+      console.log("Cakupan masih open (arah run berikutnya):");
+      for (const o of open) console.log(`  [${o.program}] ${o.vuln_class} — open (${o.n} tercatat)`);
+    }
+    return 0;
+  } finally { store.close(); }
+}
+
+function cmdTrace(args) {
+  const store = new Store();
+  try {
+    const id = Number(args._?.[1] ?? args.id);
+    if (!id) { console.error("Pakai: bounty trace <finding-id>"); return 2; }
+    const t = traceFinding(store.db, id);
+    if (t && t.finding) {
+      console.log(`Trace #${id} ${t.finding.endpoint} (${t.finding.vuln_class}) — ${t.traced ? "jalur tercatat" : "jalur minimal (bukan taint analysis dinamis)"}:`);
+      for (const step of t.path ?? []) console.log(`  -> ${step.endpoint || step.label || step.id} [${step.role ?? ""}] ${step.vuln_class || ""}`.trim());
+      if (t.note) console.log(`Catatan: ${t.note}`);
+      if (t.evidence?.length) { console.log("Evidence:"); for (const ev of t.evidence) console.log(`  [${ev.kind ?? "evidence"}] ${String(ev.content ?? ev).slice(0, 200)}`); }
+      return 0;
+    }
+    // Fallback: id kandidat (finding table baru terisi setelah review
+    // approve -> finding; kandidat belum punya chain, jadi path minimal).
+    const cand = store.db.prepare("SELECT * FROM candidate WHERE id = ?").get(id);
+    if (!cand) { console.log(`Finding/kandidat #${id} tidak ditemukan.`); return 2; }
+    console.log(`Trace #${id} ${cand.endpoint} (${cand.vuln_class}) — jalur minimal (kandidat, belum ada chain/evidence):`);
+    console.log(`  -> ${cand.endpoint} [source]`);
+    console.log(`  -> #${cand.id} ${cand.vuln_class} [sink]`);
+    console.log("Catatan: trace penuh butuh chain/evidence di store; approve kandidat dulu lalu catat langkah di chain.");
     return 0;
   } finally { store.close(); }
 }
@@ -503,6 +614,9 @@ export async function main(argv = process.argv.slice(2)) {
     case "review": return cmdReview(args);
     case "programs": return cmdPrograms();
     case "findings": return cmdFindings(args);
+    case "memory": return cmdMemory(args);
+    case "graph": return cmdGraph(args);
+    case "trace": return cmdTrace(args);
     case "report": return cmdReport(args);
     case "bench": return await cmdBench(args);
     case "scan": return await cmdScan(args);

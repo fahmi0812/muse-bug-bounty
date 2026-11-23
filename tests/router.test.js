@@ -58,3 +58,94 @@ test('router: akurasi — routerAccuracy hitung benar', () => {
   assert.equal(acc2.accuracy, 0.5, 'hanya sqli yang ada di top-5');
   assert.equal(routerAccuracy(top, []).accuracy, 0);
 });
+
+import { routeWithLessons, lessonStats } from '../bounty/lib/router.js';
+
+test('router belajar: lessons confirmed menaikkan ranking skill yang sesuai', () => {
+  // 'sql database auth login' -> sqli 2, auth-bypass 2 (seri, sqli dulu).
+  const base = routeSkills('sql database auth login', CATALOG);
+  assert.equal(base[0].name, 'sqli');
+  const lessons = [
+    { skill: 'auth-bypass', outcome: 'confirmed' },
+    { skill: 'auth-bypass', outcome: 'confirmed' },
+    { skill: 'auth-bypass', outcome: 'confirmed' },
+  ];
+  const top = routeWithLessons('sql database auth login', lessons, null, CATALOG);
+  assert.equal(top[0].name, 'auth-bypass');
+  assert.equal(top[0].score, 2.45);
+});
+
+test('router belajar: lessons false_positive menurunkannya', () => {
+  const lessons = [
+    { skill: 'sqli', outcome: 'false_positive' },
+    { skill: 'sqli', outcome: 'false_positive' },
+    { skill: 'sqli', outcome: 'false_positive' },
+  ];
+  const top = routeWithLessons('sql database auth login', lessons, null, CATALOG);
+  assert.equal(top[0].name, 'auth-bypass');
+  const sqli = top.find((s) => s.name === 'sqli');
+  assert.equal(sqli.score, 1.55);
+});
+
+test('router belajar: bonus dibatasi maks +0.45 / -0.45', () => {
+  const five = Array.from({ length: 5 }, () => ({ skill: 'auth-bypass', outcome: 'confirmed' }));
+  const top = routeWithLessons('sql database auth login', five, null, CATALOG);
+  assert.equal(top.find((s) => s.name === 'auth-bypass').score, 2.45);
+});
+
+test('router belajar: lesson vuln_class berbeda tidak dihitung', () => {
+  const catalog = [
+    { name: 'a', vuln_class: 'SQL Injection', keywords: ['sql', 'injection'] },
+    { name: 'b', vuln_class: 'Cross-Site Scripting', keywords: ['sql', 'xss'] },
+    { name: 'triage-generic', keywords: ['triage'] },
+  ];
+  const lessons = [
+    { skill: 'b', vuln_class: 'SQL Injection', outcome: 'confirmed' },
+    { skill: 'b', vuln_class: 'SQL Injection', outcome: 'confirmed' },
+    { skill: 'b', vuln_class: 'SQL Injection', outcome: 'confirmed' },
+  ];
+  const top = routeWithLessons('sql injection', lessons, null, catalog);
+  // 'b' kelasnya XSS, lesson kelas SQL Injection tidak berlaku -> skor tetap 1.
+  assert.equal(top.find((s) => s.name === 'b').score, 1);
+  // Lesson tanpa vuln_class berlaku untuk skill itu di kelas apa pun.
+  const top2 = routeWithLessons('sql injection', [{ skill: 'b', outcome: 'confirmed' }], null, catalog);
+  assert.equal(top2.find((s) => s.name === 'b').score, 1.15);
+});
+
+test('router belajar: tanpa lessons hasil IDENTIK dengan routeSkills()', () => {
+  for (const ctx of ['sql injection in login database query', 'reflected cross-site scripting dom', 'hello world', '']) {
+    assert.deepEqual(
+      routeWithLessons(ctx, [], null, CATALOG),
+      routeSkills(ctx, CATALOG),
+      `harus identik untuk konteks: ${JSON.stringify(ctx)}`,
+    );
+    assert.deepEqual(routeWithLessons(ctx, null, null, CATALOG), routeSkills(ctx, CATALOG));
+  }
+});
+
+test('router belajar: lessonStats menghitung confirmed/falsePositive per skill', () => {
+  const stats = lessonStats([
+    { skill: 'hunt-sqli', outcome: 'confirmed' },
+    { skill: 'hunt-sqli', outcome: 'confirmed' },
+    { skill: 'hunt-sqli', outcome: 'false_positive' },
+    { skill: 'hunt-xss', outcome: 'false_positive' },
+    { skill: 'hunt-xss', outcome: 'bogus' },
+    { skill: '', outcome: 'confirmed' },
+  ]);
+  assert.deepEqual(stats, {
+    'hunt-sqli': { confirmed: 2, falsePositive: 1 },
+    'hunt-xss': { confirmed: 0, falsePositive: 1 },
+  });
+});
+
+test('router belajar: hanya pola BERSITASI menambah skor bukti', () => {
+  const cited = [{ skill: 'sqli', uncited: false, h1_report_id: '123456', link: 'https://hackerone.com/reports/123456' }];
+  const top = routeWithLessons('sql database auth login', [], cited, CATALOG);
+  assert.equal(top[0].name, 'sqli');
+  assert.equal(top[0].score, 2.05);
+  const uncited = [{ skill: 'sqli', uncited: true, h1_report_id: null, link: null }];
+  assert.deepEqual(
+    routeWithLessons('sql database auth login', [], uncited, CATALOG),
+    routeSkills('sql database auth login', CATALOG),
+  );
+});

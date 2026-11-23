@@ -4,6 +4,18 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-23
+
+### Added
+- **v1.2 — Ingatan + peta (plan-power-v1.1):**
+  - **M0 fondasi memori** (`bounty/lib/memory.js`): tabel `memory_episode` (append-only, ditulis tiap `run` dan `review`), `memory_fact` (triple + validitas bi-temporal: invalidasi, bukan DELETE), `memory_lesson` (hanya dari verdict manusia approve/reject), `memory_coverage` (permukaan × kelas: examined/ruled_out/open). CLI `bounty memory [--list] [--lessons] [--program X]`.
+  - **M1 pencarian serupa (FTS5)**: `finding_fts` + trigger sinkronisasi atas `candidate`; `findSimilar()` dengan RRF (0,5·BM25 + 0,3·cosine TF-IDF di JS + 0,2·boost kelas+CWE sama). `bounty findings --similar <id>`; `bounty run` memberi peringatan bila pola serupa pernah ditolak (FP) oleh reviewer.
+  - **M2 router belajar** (`bounty/lib/router.js`): `routeWithLessons()` — skor skill = keyword + track record (+0,15 per `confirmed`, −0,15 per `false_positive`, maks ±0,45); tanpa lesson hasil identik dengan router lama. Bench kini memakai lesson + pola (`eval/run-bench.mjs`).
+  - **Pola laporan sebagai data** (`bounty/data/report-patterns.json`, 12 pola seed): `{skill, subclass, cwe, cve, h1_report_id, tahun, payout}` + link. **Jujur: ke-12 pola `uncited: true`** — tidak ada ID laporan/CVE/tahun/payout yang dikarang; bonus bukti pola router = 0 sampai ada pola bersitasi terverifikasi.
+  - **M3 graf sebagai view** (`bounty/lib/graph.js`): `v_graph_node/edge/coverage/hot_asset/finding_chain` — view murni, 0 migrasi; chain rekursif CTE depth ≤ 5. **Fix integrasi:** kandidat ikut jadi node + edge `program->candidate`, karena tabel asset/endpoint hampir tidak pernah terisi — tanpa ini graf kosong setelah run. CLI `bounty graph [--program X]` (fallback: program dengan kandidat terbanyak).
+  - **M4 trace Shannon**: `bounty trace <finding-id>` — jejak source → sink dari chain + evidence yang tercatat; bila tidak ada, path minimal + penjelasan jujur (bukan taint analysis dinamis). Fallback ke id kandidat.
+- **Batasan jujur v1.2:** `traceFinding` hanya dari chain/evidence tercatat; `v_coverage` fallback hanya mengenal examined/open (`ruled_out` butuh `memory_coverage`); pola laporan semuanya uncited sampai ada sitasi terverifikasi.
+
 ## [1.1.0] — 2026-11-23
 
 ### Added
