@@ -13,12 +13,13 @@ import { scanText, redact } from "../lib/secrets.js";
 import { buildReviewHtml } from "../lib/review-html.js";
 import { TokenBucket } from "../lib/rate.js";
 import { getRoleProfile, buildInstruction } from "../lib/auth.js";
-import { detectModels, saveProvider, writeStrixConfig, NINE_ROUTER_BASE } from "../lib/provider.js";
+import { detectModels, saveProvider, writeStrixConfig, loadProviders, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
 import { checkFailOn, severityFor } from "../lib/failon.js";
-import { color, table, summaryBox, formatUsd, progressBar, severityBadge, phaseLine } from "../lib/ui.js";
+import { color, table, summaryBox, formatUsd, progressBar, severityBadge, phaseLine, heading, hint } from "../lib/ui.js";
+import { slugify, normalizeHost, scopeTemplate, SCOPE_TEMPLATES, defaultProviderBase, filterModels, buildProgramMarkdown, exampleTargetFor } from "../lib/setup.js";
 import { searchCode } from "../lib/codesearch.js";
 import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
 import { budgetStatus } from "../lib/cost.js";
@@ -68,6 +69,13 @@ const HELP = `bounty — muse-bug-bounty wrapper v${VERSION} (zero-dependency, $
 Penggunaan: bounty <perintah> [opsi]   (jalankan 'bounty --help' untuk detail)
 
 SETUP
+  bounty setup
+      Wizard terpandu satu alur (berwarna di terminal): prasyarat -> provider
+      -> target/scope -> verifikasi. Folder programs/ & .bounty/ dibuat
+      otomatis; program disimpan ke programs/<nama>.md. Key tersimpan 0600,
+      tidak pernah dilog/ditampilkan. Non-interaktif: tambahkan --yes beserta
+      flag (--api-key, --model, --host, --template all|api|custom, --budget,
+      --rate, --roles, --skip-provider).
   bounty provider [--type openai|anthropic] [--base-url URL] [--model ID]
       Pilih provider/model LLM (interaktif via stdin). Deteksi model dari
       {baseUrl}/models. Simpan ke .bounty/providers/ (0600).
@@ -79,6 +87,8 @@ ALUR INTI
              [--budget 5] [--dry-run] [--targets URL1,URL2]
       Jalankan Strix dalam scope program. Scope-gate dulu, lalu pre-exec
       guard, rate limiter, budget default $${DEFAULT_BUDGET_USD}.
+      Tanpa argumen di terminal: tampilkan daftar program tersimpan untuk
+      dipilih (pilih nomor, lalu konfirmasi target).
       Tanpa --dry-run dan tanpa binary strix di PATH -> exit 2.
       --targets: antrean multi-target (satu per satu, satu pool budget).
       --fail-on low|medium|high|critical: exit 3 bila ada temuan >= ambang
@@ -218,6 +228,27 @@ function ask(rl, q) {
   return new Promise((resolve) => rl.question(q, (a) => resolve(a.trim())));
 }
 
+// Prompt tanpa echo (untuk API key): tiap ketikan, bersihkan baris lalu
+// tulis ulang prompt saja, jadi nilai tidak pernah tampil di layar.
+// Hanya dipanggil di TTY; kalau apa pun gagal, jatuh balik ke ask biasa.
+function askHidden(rl, q) {
+  return new Promise((resolve) => {
+    try {
+      const output = rl.output;
+      output.write(q);
+      const onKeypress = () => { try { output.write(`\u001b[2K\u001b[200D${q}`); } catch {} };
+      rl.input.on("keypress", onKeypress);
+      rl.question("", (a) => {
+        rl.input.removeListener("keypress", onKeypress);
+        output.write("\n");
+        resolve(String(a).trim());
+      });
+    } catch {
+      rl.question(q, (a) => resolve(String(a).trim()));
+    }
+  });
+}
+
 // Tampilan scope gate yang seragam: OK -> stdout (hijau, gaya fase),
 // DITOLAK -> stderr (merah) karena itu kondisi gagal + exit 2.
 function printScope(ok, reason) {
@@ -257,6 +288,196 @@ async function cmdProvider(args) {
   } finally {
     rl.close();
   }
+}
+
+// --- bounty setup: wizard terpandu satu alur (prasyarat -> provider ->
+//     program -> verifikasi). Warna nyala otomatis di TTY (colorsEnabled).
+//     Non-TTY: tidak menggantung — minta flag atau keluar dengan pesan. ---
+function listProgramFiles() {
+  const dir = resolve(process.cwd(), "programs");
+  try { return readdirSync(dir).filter((f) => f.endsWith(".md")).sort().map((f) => join(dir, f)); }
+  catch { return []; }
+}
+
+async function stepPrerequisites() {
+  console.log(heading("1/4 — Prasyarat"));
+  const nodeOk = (() => { try { return Number(process.versions.node.split(".")[0]) >= 20; } catch { return false; } })();
+  console.log(`  Node ${process.version}: ${nodeOk ? color("OK", "green") : color("perlu >= 20", "red")}`);
+  const strix = findBinary("strix");
+  if (strix) console.log(`  Strix: ${color("ditemukan", "green")} (${strix})`);
+  else console.log(`  Strix: ${color("belum ada", "yellow")} — install nanti via 'bounty install --strix' (setup tetap lanjut)`);
+  return { nodeOk, strixFound: Boolean(strix) };
+}
+
+async function stepProvider(rl, args) {
+  console.log("");
+  console.log(heading("2/4 — Provider LLM"));
+  const existing = loadProviders();
+  if (existing && rl && !args["reconfigure-provider"]) {
+    const reuse = (await ask(rl, `  Provider tersimpan: ${existing.type}/${existing.model}. Pakai ini? [Y/n] `)).toLowerCase();
+    if (reuse !== "n" && reuse !== "no") { console.log(`  ${color("Pakai provider tersimpan.", "green")}`); return { ok: true, reused: true }; }
+  }
+  const type = args["provider-type"] || (rl ? (await ask(rl, `  Tipe (openai/anthropic) ${hint("[openai]")}: `)) : "") || "openai";
+  const defBase = defaultProviderBase(type);
+  const baseUrl = args["base-url"] || (rl ? (await ask(rl, `  Base URL ${hint(`[${defBase}]`)}: `)) : "") || defBase;
+  const apiKey = args["api-key"] || process.env.LLM_API_KEY || (rl ? await askHidden(rl, "  API key (tidak ditampilkan/dilog): ") : "");
+  if (!apiKey) { console.error(color("  API key kosong — provider tidak bisa disetel.", "red")); return { ok: false }; }
+  console.log("  Mendeteksi model...");
+  let detected;
+  try { detected = await detectModels({ type, baseUrl, apiKey }); }
+  catch (e) { console.error(color(`  Gagal deteksi model: ${e.message}`, "red")); return { ok: false }; }
+  if (detected.warning) console.log(color(`  Peringatan: ${detected.warning}`, "yellow"));
+  let models = detected.models;
+  if (rl && models.length > 12) {
+    const q = await ask(rl, `  ${models.length} model — ketik filter (Enter = tampil semua): `);
+    const filtered = filterModels(models, q);
+    if (filtered.length > 0) models = filtered;
+  }
+  console.log(`  Model tersedia (${models.length}):`);
+  models.slice(0, 20).forEach((m, i) => console.log(`    ${color(String(i + 1), "cyan")}. ${m}`));
+  const sel = args.model || (rl ? await ask(rl, "  Pilih model (id/nomor): ") : "");
+  const picked = /^\d+$/.test(sel) ? models[Number(sel) - 1] : sel;
+  if (!picked) { console.error(color("  Model tidak dipilih.", "red")); return { ok: false }; }
+  saveProvider({ name: `${type}-${picked}`, type, baseUrl, apiKey, model: picked });
+  const cfg = writeStrixConfig(picked, baseUrl, apiKey, type);
+  console.log(`  ${color("Provider tersimpan", "green")} (0600). Strix config: ${cfg}`);
+  console.log(`  STRIX_LLM=${type}/${picked} ${hint("(key tidak ditampilkan)")}`);
+  return { ok: true, model: picked };
+}
+
+async function stepProgram(rl, args) {
+  console.log("");
+  console.log(heading("3/4 — Target & scope"));
+  const existingFiles = listProgramFiles();
+  // Mode pilih program yang sudah ada (hanya interaktif, bila tidak maksa buat baru).
+  if (rl && existingFiles.length > 0 && !args.host && !args.name) {
+    console.log(`  Program tersimpan (${existingFiles.length}):`);
+    existingFiles.forEach((f, i) => {
+      let label = f;
+      try { label = (loadProgramFile(f).name || f).replace(/^Program:\s*/i, ""); } catch {}
+      console.log(`    ${color(String(i + 1), "cyan")}. ${label}  ${hint(f.replace(process.cwd() + "/", ""))}`);
+    });
+    const ans = await ask(rl, `  Pilih nomor untuk pakai yang ada, atau 'b' untuk buat baru ${hint("[b]")}: `);
+    if (/^\d+$/.test(ans) && existingFiles[Number(ans) - 1]) {
+      const path = existingFiles[Number(ans) - 1];
+      const prog = loadProgramFile(path);
+      return { ok: true, path, host: prog.allowedHosts[0] || "", allowed: prog.allowedPaths.length ? prog.allowedPaths : ["/"] };
+    }
+  }
+  // Buat program baru.
+  const host = normalizeHost(args.host || (rl ? await ask(rl, "  Host target (mis. staging.contoh.com): ") : ""));
+  if (!host) { console.error(color("  Host kosong — tidak bisa bikin program.", "red")); return { ok: false }; }
+  const name = (args.name || (rl ? await ask(rl, `  Nama program ${hint(`[${host}]`)}: `) : "") || host).trim();
+  let tmpl = scopeTemplate(args.template || "");
+  if (!tmpl && rl) {
+    console.log("  Template scope:");
+    console.log(`    ${color("1", "cyan")}. ${SCOPE_TEMPLATES.all.label}`);
+    console.log(`    ${color("2", "cyan")}. ${SCOPE_TEMPLATES.api.label}`);
+    console.log(`    ${color("3", "cyan")}. ${SCOPE_TEMPLATES.custom.label}`);
+    tmpl = scopeTemplate(await ask(rl, `  Pilih ${hint("[1]")}: `)) || scopeTemplate("all");
+  }
+  tmpl = tmpl || scopeTemplate("all");
+  let allowed = tmpl.allowed;
+  if (tmpl.key === "custom") {
+    const raw = rl ? await ask(rl, `  Path Allowed (pisah koma) ${hint("[/]")}: `) : "";
+    allowed = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : ["/"];
+  }
+  const deniedRaw = args.denied ?? (rl ? await ask(rl, `  Path Denied (pisah koma) ${hint("[kosong]")}: `) : "");
+  const denied = String(deniedRaw || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const budget = Number(args.budget ?? (rl ? await ask(rl, `  Budget USD ${hint("[5]")}: `) : "") ) || 5;
+  const rate = Number(args.rate ?? (rl ? await ask(rl, `  Rate req/detik ${hint("[10]")}: `) : "")) || 10;
+  const rolesRaw = args.roles ?? (rl ? await ask(rl, `  Roles ${hint("[low, high]")}: `) : "");
+  const roles = String(rolesRaw || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
+  const md = buildProgramMarkdown({ name, host, allowed, denied, budget, rate, roles: roles.length ? roles : ["low", "high"] });
+  const path = join(resolve(process.cwd(), "programs"), `${slugify(name)}.md`);
+  mkdirSync(resolve(process.cwd(), "programs"), { recursive: true });
+  if (existsSync(path) && rl) {
+    const ow = (await ask(rl, `  ${color(`${path} sudah ada. Timpa?`, "yellow")} [y/N] `)).toLowerCase();
+    if (ow !== "y" && ow !== "yes") { console.log("  Dibatalkan — pakai file yang ada."); return { ok: true, path, host, allowed: loadProgramFile(path).allowedPaths.length ? loadProgramFile(path).allowedPaths : ["/"] }; }
+  }
+  writeFileSync(path, md, "utf8");
+  console.log(`  ${color("Program ditulis", "green")}: ${path.replace(process.cwd() + "/", "")}`);
+  return { ok: true, path, host, allowed };
+}
+
+function stepVerify(programPath, host, allowed) {
+  console.log("");
+  console.log(heading("4/4 — Verifikasi scope"));
+  const program = loadProgramFile(programPath);
+  const target = exampleTargetFor(host || program.allowedHosts[0] || "", allowed);
+  const scope = checkScope(program, target);
+  console.log(`  Target contoh: ${target}`);
+  if (scope.ok) console.log(`  ${color("Scope OK", "green")}`);
+  else console.error(`  ${color(`Scope DITOLAK: ${scope.reason}`, "red")}`);
+  return { ok: scope.ok, target };
+}
+
+async function cmdSetup(args) {
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY) && !args["non-interactive"];
+  if (!interactive && !args.yes) {
+    console.error("bounty setup butuh terminal interaktif (TTY).");
+    console.error("Untuk non-interaktif tambahkan --yes beserta flag, mis.:");
+    console.error("  bounty setup --yes --api-key KEY --model ID --host staging.contoh.com \\");
+    console.error("    [--provider-type openai] [--base-url URL] [--name NAMA] \\");
+    console.error("    [--template all|api|custom] [--budget 5] [--rate 10] [--roles low,high]");
+    console.error("Skip langkah: --skip-provider (pakai provider tersimpan).");
+    return 2;
+  }
+  const rl = interactive ? createInterface({ input: process.stdin, output: process.stdout }) : null;
+  try {
+    console.log(heading(`bounty setup — alur terpandu v${VERSION}`));
+    await stepPrerequisites();
+    if (!args["skip-provider"]) {
+      const prov = await stepProvider(rl, args);
+      if (!prov.ok) return 2;
+    } else {
+      console.log("");
+      console.log(heading("2/4 — Provider LLM"));
+      console.log(`  ${color("Dilewati", "yellow")} (--skip-provider) — pakai provider tersimpan bila ada.`);
+    }
+    const prog = await stepProgram(rl, args);
+    if (!prog.ok) return 2;
+    const verify = stepVerify(prog.path, prog.host, prog.allowed);
+    console.log("");
+    const relPath = prog.path.replace(process.cwd() + "/", "");
+    console.log(summaryBox([
+      `Program: ${relPath}`,
+      `Scope: ${verify.ok ? color("OK", "green") : color("DITOLAK", "red")}`,
+      "Perintah siap jalan:",
+      `  bounty run --program ${relPath} --target ${verify.target}`,
+    ], { title: "Setup selesai" }));
+    if (!verify.ok) { console.error(color("Scope belum lolos — perbaiki Allowed/Denied di program lalu ulangi.", "red")); return 2; }
+    return 0;
+  } finally {
+    if (rl) rl.close();
+  }
+}
+
+// Picker interaktif untuk `bounty run` tanpa argumen: pilih program lalu
+// konfirmasi target (default = contoh in-scope). Non-TTY -> kembalikan null
+// agar cmdRun memakai perilaku default lama (tidak menggantung).
+async function pickRunInteractive() {
+  const files = listProgramFiles();
+  if (files.length === 0) {
+    console.log("Belum ada program di programs/. Jalankan 'bounty setup' dulu untuk membuatnya.");
+    return { code: 2 };
+  }
+  console.log(heading("Pilih program untuk di-run:"));
+  files.forEach((f, i) => {
+    let label = f;
+    try { label = (loadProgramFile(f).name || f).replace(/^Program:\s*/i, ""); } catch {}
+    console.log(`  ${color(String(i + 1), "cyan")}. ${label}  ${hint(f.replace(process.cwd() + "/", ""))}`);
+  });
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    const sel = await ask(rl, "Nomor program (Enter = batal): ");
+    if (!/^\d+$/.test(sel) || !files[Number(sel) - 1]) { console.log("Dibatalkan."); return null; }
+    const path = files[Number(sel) - 1];
+    const prog = loadProgramFile(path);
+    const def = exampleTargetFor(prog.allowedHosts[0] || "", prog.allowedPaths.length ? prog.allowedPaths : ["/"]);
+    const t = await ask(rl, `Target ${hint(`[${def}]`)}: `);
+    return { program: path, target: t || def };
+  } finally { rl.close(); }
 }
 
 async function runSingleTarget(args, targetOverride = null) {
@@ -469,6 +690,14 @@ async function runSingleTarget(args, targetOverride = null) {
 // P1-5: --fail-on <sev> (exit 3 bila temuan >= ambang), --pause (tulis
 // state jeda bila budget habis, exit 4), --resume <file> (lanjutkan sisa).
 async function cmdRun(args) {
+  // Tanpa argumen target/program/targets/resume di TTY -> picker program.
+  // Non-TTY dibiarkan ke perilaku default lama (tidak menggantung di prompt).
+  if (!args.target && !args.program && !args.targets && !args.resume && process.stdin.isTTY && process.stdout.isTTY) {
+    const picked = await pickRunInteractive();
+    if (picked === null) return 0;
+    if (picked.code) return picked.code;
+    args = { ...args, program: picked.program, target: picked.target };
+  }
   const failOn = String(args["fail-on"] ?? "").toLowerCase();
   if (failOn && !["low", "medium", "high", "critical"].includes(failOn)) {
     console.error("--fail-on wajib: low | medium | high | critical.");
@@ -1323,7 +1552,7 @@ function cmdInstall(args) {
 }
 
 const COMMANDS = [
-  "provider", "run", "view", "review", "programs", "findings", "memory",
+  "setup", "provider", "run", "view", "review", "programs", "findings", "memory",
   "graph", "trace", "report", "bench", "scan", "recon", "oast", "platform",
   "patterns", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
   "firmware", "promptfoo-gate", "graph-gate", "install",
@@ -1362,6 +1591,7 @@ export async function main(argv = process.argv.slice(2)) {
   }
   switch (cmd) {
     case "provider": return await cmdProvider(args);
+    case "setup": return await cmdSetup(args);
     case "run": return await cmdRun(args);
     case "view": return cmdView();
     case "review": return cmdReview(args);
