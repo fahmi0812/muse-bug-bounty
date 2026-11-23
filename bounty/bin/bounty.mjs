@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
 // Commands: provider | run | review | report | bench | install | programs | findings | scan | memory | graph | trace | --help | --version
-import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync, mkdirSync, appendFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync, mkdirSync, appendFileSync, realpathSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -1502,7 +1502,15 @@ export async function main(argv = process.argv.slice(2)) {
   }
 }
 
-const isMain = process.argv[1] && resolve(process.argv[1]) === resolve(new URL(import.meta.url).pathname);
+// isMain harus tahan symlink (instal global npm: argv[1] = path symlink,
+// import.meta.url = path asli) dan spasi di path (pathname URL = %20).
+// resolve() saja tidak cukup: pakai realpathSync + fileURLToPath (decode %20).
+let isMain = false;
+try {
+  isMain = !!process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url);
+} catch {
+  isMain = !!process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+}
 if (isMain) {
   main().then((code) => { process.exitCode = code; }).catch((e) => {
     console.error(e?.message ?? e);
