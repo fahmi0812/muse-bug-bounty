@@ -44,6 +44,7 @@ import { getProgramScope, searchHacktivity, draftReport, syncScopeToProgram } fr
 import { runBinwalkNg, runUnblob, runCveBinTool } from "../lib/firmware.js";
 import { readPromptfooResults, gateResults } from "../lib/promptfoo-gate.js";
 import { decideGraphUpgrade } from "../lib/graph-gate.js";
+import { findRepoDir, runUpdate } from "../lib/update.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
@@ -59,7 +60,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.12.1";
+export const VERSION = "1.13.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -83,6 +84,11 @@ SETUP
       {baseUrl}/models. Simpan ke .bounty/providers/ (0600).
   bounty install [--strix]
       Cek/instal Strix via curl resmi (hanya tampilkan perintah, tidak auto-run pipe-to-shell).
+  bounty update [--source DIR] [--dry-run]
+      Perbarui wrapper ke versi terbaru: cari clone repo (folder saat ini,
+      ~/muse-bug-bounty, atau --source), stash perubahan lokal bila ada,
+      git pull --ff-only, lalu npm install -g. --dry-run hanya menampilkan
+      rencana tanpa mengubah apa pun.
 
 ALUR INTI
   bounty run [--program programs/example.md] [--target URL] [--role low|high]
@@ -1700,11 +1706,52 @@ function cmdInstall(args) {
   return 0;
 }
 
+function cmdUpdate(args) {
+  const dir = findRepoDir({ source: args.source || args["source-dir"] || null });
+  if (!dir) {
+    console.error("Clone muse-bug-bounty tidak ditemukan.");
+    console.error("Jalankan dari dalam folder clone, atau: bounty update --source ~/muse-bug-bounty");
+    return 2;
+  }
+  if (args["dry-run"]) {
+    const plan = runUpdate({ dir, dryRun: true });
+    console.log(`Repo: ${plan.dir}`);
+    console.log(`Versi saat ini: v${plan.from ?? "?"}`);
+    if (plan.dirty.length > 0) {
+      console.log(`Perubahan lokal (akan di-stash dulu, ${plan.dirty.length} file):`);
+      plan.dirty.forEach((l) => console.log(`  ${l}`));
+    }
+    console.log("Rencana: git pull --ff-only, lalu npm install -g --ignore-scripts.");
+    console.log("(dry-run: tidak ada yang diubah.)");
+    return 0;
+  }
+  console.log(`Repo: ${dir}`);
+  const before = runUpdate({ dir, dryRun: true });
+  if (before.dirty.length > 0) {
+    console.log(`Perubahan lokal terdeteksi (${before.dirty.length} file) — di-stash dulu, dikembalikan setelah pull.`);
+  }
+  console.log("Menarik update (git pull --ff-only)...");
+  let result;
+  try {
+    result = runUpdate({ dir });
+  } catch (e) {
+    console.error(String(e.message || e));
+    return 2;
+  }
+  if (result.stashed && result.stashRestored === false) {
+    console.error("Catatan: stash tidak bisa dikembalikan otomatis (bentrok dengan update).");
+    console.error(`Perubahan lokalmu aman di stash — pulihkan manual: git -C ${dir} stash pop`);
+  }
+  console.log(`Selesai: v${result.from ?? "?"} -> v${result.to ?? "?"} (global sudah diinstal ulang).`);
+  console.log("Cek: bounty --version");
+  return 0;
+}
+
 const COMMANDS = [
   "setup", "provider", "run", "view", "review", "programs", "findings", "memory",
   "graph", "trace", "report", "bench", "scan", "recon", "oast", "platform",
   "patterns", "skills", "plan", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
-  "firmware", "promptfoo-gate", "graph-gate", "install",
+  "firmware", "promptfoo-gate", "graph-gate", "install", "update",
 ];
 
 // Jarak edit Levenshtein untuk saran "maksud Anda ...".
@@ -1768,6 +1815,7 @@ export async function main(argv = process.argv.slice(2)) {
     case "promptfoo-gate": return cmdPromptfooGate(args);
     case "graph-gate": return cmdGraphGate(args);
     case "install": return cmdInstall(args);
+    case "update": return cmdUpdate(args);
     default: {
       console.error(`Perintah tidak dikenal: ${cmd}`);
       const hint = suggestCommand(cmd);

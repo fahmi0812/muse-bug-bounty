@@ -16,10 +16,10 @@ function runCli(args, env = {}) {
   return r;
 }
 
-test("v1.10 CLI: --version mencetak 1.12.1; index skill 90 entri", async () => {
+test("v1.10 CLI: --version mencetak 1.13.0; index skill 90 entri", async () => {
   const r = runCli(["--version"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /bounty v1.12.1/);
+  assert.match(r.stdout, /bounty v1.13.0/);
   const { readFileSync } = await import("node:fs");
   const idx = JSON.parse(readFileSync(join(ROOT, "skills/bounty/skills-index.json"), "utf8"));
   assert.equal(idx.length, 90);

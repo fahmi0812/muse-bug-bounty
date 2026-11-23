@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.0] — 2026-11-24
+
+### Added
+- **`bounty update` — perbarui wrapper dengan satu perintah.** `git pull` berulang kali gagal di laptop Fahmi karena perubahan lokal di `bounty/bin/bounty.mjs` (bukan editan sengaja) menghalangi merge. Kini cukup `bounty update` dari mana saja: cari clone otomatis (folder saat ini / `~/muse-bug-bounty` / lokasi lama, atau `--source DIR`), stash perubahan tracked bila ada, `git pull --ff-only`, lalu `npm install -g --ignore-scripts`, dan coba kembalikan stash (bila bentrok, stash tetap aman + petunjuk pulihkan manual). `--dry-run` hanya menampilkan rencana. File untracked (program buatan sendiri, `.bounty/`) tidak disentuh.
+
 ## [1.12.1] — 2026-11-24
 
 ### Fixed

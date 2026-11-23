@@ -122,6 +122,10 @@ staging.contoh.com [--template all|api|custom]`; `--skip-provider`
 memakai provider tersimpan. Wizard lama `bounty provider` tetap ada
 untuk mengubah provider saja.
 
+Update ke versi terbaru nanti tinggal satu perintah dari mana saja:
+`bounty update` (cari clone otomatis, `git pull` + instal ulang global;
+perubahan lokal di-stash dulu lalu dikembalikan).
+
 ## Quickstart
 
 ```bash
