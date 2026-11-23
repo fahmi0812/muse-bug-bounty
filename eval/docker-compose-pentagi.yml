@@ -1,0 +1,58 @@
+# PentAGI penuh — compose OPSIONAL (P2, belum dipakai v1)
+# v1 memakai bounty.db saja. File ini hanya disiapkan untuk Fase 2.
+# JANGAN isi kredensial asli di sini — semua password placeholder
+# REPLACE-ME, isi lewat file .env lokal (lihat .env.example).
+# Jalankan hanya di mesin sendiri / lab lokal, bukan di server publik.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: bounty
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-REPLACE-ME}
+      POSTGRES_DB: bounty_graph
+    ports:
+      - "5432:5432"
+    volumes:
+      - pentagi-pgdata:/var/lib/postgresql/data
+    networks: [bounty-pentagi]
+
+  neo4j:
+    image: neo4j:5
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-REPLACE-ME}
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - pentagi-neo4j:/data
+    networks: [bounty-pentagi]
+
+  langfuse:
+    image: langfuse/langfuse:latest
+    environment:
+      DATABASE_URL: postgres://bounty:${POSTGRES_PASSWORD:-REPLACE-ME}@postgres:5432/bounty_graph
+      NEXTAUTH_SECRET: ${LANGFUSE_SECRET:-REPLACE-ME}
+      SALT: ${LANGFUSE_SALT:-REPLACE-ME}
+    ports:
+      - "3001:3000"
+    depends_on: [postgres]
+    networks: [bounty-pentagi]
+
+  grafana:
+    image: grafana/grafana:latest
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-REPLACE-ME}
+    ports:
+      - "3002:3000"
+    volumes:
+      - pentagi-grafana:/var/lib/grafana
+    networks: [bounty-pentagi]
+
+volumes:
+  pentagi-pgdata:
+  pentagi-neo4j:
+  pentagi-grafana:
+
+networks:
+  bounty-pentagi:
+    driver: bridge

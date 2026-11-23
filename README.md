@@ -1,5 +1,11 @@
 # muse-bug-bounty
 
+> **Status: produksi v1.0.0 (2026-11-23).** Wrapper, skill, eval harness,
+> docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
+> `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
+> [Batasan live](#batasan-live) — beberapa jalur belum diuji live
+> (Docker/Strix/provider/PowerShell) dan ditulis jujur di sana.
+
 Tool `bounty` — pembungkus aman dan ringan di atas
 [Strix](https://github.com/usestrix/strix) (`usestrix/strix`, Apache-2.0)
 untuk bug bounty web-first: scope gate, guard pra-eksekusi, rate limiter
@@ -50,6 +56,19 @@ BOUNTY_DOCKER=1 bash scripts/install.sh   # dengan Docker
 BOUNTY_DOCKER=0 bash scripts/install.sh   # tanpa Docker
 bash scripts/install.sh --no-docker       # flag juga bisa
 ```
+
+## Install tim (kontributor)
+
+Cukup 1 perintah — tanpa Strix, Docker, atau provider:
+
+```bash
+git clone https://github.com/fahmi0812/muse-bug-bounty.git && cd muse-bug-bounty && npm test
+```
+
+Lalu baca [docs/TEAM.md](docs/TEAM.md) (peran, aturan scope, budget,
+audit, larangan) dan [CONTRIBUTING.md](CONTRIBUTING.md). Salin
+`.env.example` ke `.env` bila butuh variabel lokal — isinya hanya
+placeholder `REPLACE-ME`, jangan commit `.env`.
 
 Lalu instal Strix (bukan bagian repo ini):
 
@@ -129,6 +148,21 @@ tidak turun dibanding baseline Strix. Detail di
   selain provider yang user pilih.
 - **Tanpa auto-submit / pembayaran** — temuan hanya disimpan lokal
   (`bounty.db` + `evidence/`); submit ke program selalu manual oleh user.
+
+## Batasan live (jujur — belum diuji live)
+
+- **Docker/Strix belum diuji live di VM ini**: lab eval jalan mode
+  no-docker (mock findings deterministik); `docker compose` lab dan
+  Strix asli belum dijalankan di sini.
+- **Provider picker belum diuji live**: belum ada panggilan API
+  berbayar / `GET /models` ke provider nyata dari repo ini.
+- **PowerShell installer (`scripts/install.ps1`) belum diuji live**
+  di Windows.
+- **P2 belum diuji live**: fork Strix, PentAGI, MCP platform, RE,
+  mobile, LLM red-team, capture 2FA — semuanya docs + template di
+  `docs/p2-*.md`, belum ada run nyata.
+- Bench live ke lab Docker (Juice Shop/DVWA/VAmPI sungguhan) belum
+  dijalankan; angka TP/FP sejauh ini dari mock deterministik.
 
 ## Lisensi & atribusi
 

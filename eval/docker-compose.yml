@@ -20,6 +20,27 @@ services:
       - "5000:5000"
     networks: [bounty-lab]
 
+  # P1-3 — GraphQL. Image resmi DVGA (Dolev Farhi).
+  dvga:
+    image: dolevf/dvga:latest
+    ports:
+      - "5013:5013"
+    networks: [bounty-lab]
+
+  # P1-3 — app ber-LLM. PLACEHOLDER: belum ada satu image lab LLM resmi
+  # yang dipatok (kandidat: lab OWASP LLM Top 10 / playground prompt
+  # injection). Service ini tidak ikut `up` default (profile: llm) dan
+  # memakai image Python resmi sebagai stand-in sampai lab final dipilih
+  # dan oracle llm-app.json diverifikasi terhadapnya. Jangan pakai image
+  # ini sebagai klaim lab LLM sudah tervalidasi.
+  llm-app:
+    image: python:3.12-slim
+    command: ["python", "-m", "http.server", "8000"]
+    ports:
+      - "8000:8000"
+    profiles: ["llm"]
+    networks: [bounty-lab]
+
 networks:
   bounty-lab:
     driver: bridge

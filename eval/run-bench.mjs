@@ -4,7 +4,7 @@
 // Memakai lib nyata bila ada (bounty/lib/bench.js, router.js, store.js);
 // bila belum ada, fallback lokal dipakai supaya bench tetap bisa jalan.
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +13,20 @@ const LABELS_DIR = join(ROOT, 'eval', 'oracle', 'labels');
 const RESULTS_DIR = join(ROOT, 'eval', 'results');
 const LABS = ['juice-shop', 'dvwa', 'vampi'];
 const RUNS = 3;
+
+// P1-3: lab ditemukan otomatis dari eval/oracle/labels/*.json — lab baru
+// (dvga, llm-app, ...) ikut bench tanpa ubah kode. Bila direktori label
+// tidak bisa dibaca, fallback ke daftar LABS di atas.
+export function discoverLabs() {
+  try {
+    return readdirSync(LABELS_DIR)
+      .filter((f) => f.endsWith('.json'))
+      .sort()
+      .map((f) => f.replace(/\.json$/, ''));
+  } catch {
+    return [...LABS];
+  }
+}
 
 export function median(values) {
   const s = [...values].sort((a, b) => a - b);
@@ -121,8 +135,14 @@ export async function runBench({ runs = RUNS } = {}) {
   const med = lib.bench?.median ?? median;
 
   const labs = [];
-  for (const lab of LABS) {
-    const oracle = JSON.parse(readFileSync(join(LABELS_DIR, `${lab}.json`), 'utf8'));
+  for (const lab of discoverLabs()) {
+    let oracle;
+    try {
+      oracle = JSON.parse(readFileSync(join(LABELS_DIR, `${lab}.json`), 'utf8'));
+    } catch (err) {
+      console.log(`Lab ${lab} di-skip: oracle tidak bisa dibaca (${err.message})`);
+      continue;
+    }
     const perRun = [];
     for (let run = 0; run < runs; run += 1) {
       const findings = mockFindings(oracle, run);

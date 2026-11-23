@@ -8,6 +8,9 @@ import { createInterface } from "node:readline";
 import { Store } from "../lib/store.js";
 import { parseProgram, loadProgramFile, checkScope } from "../lib/scope.js";
 import { checkCommand } from "../lib/guard.js";
+import { logAudit } from "../lib/audit.js";
+import { scanText, redact } from "../lib/secrets.js";
+import { buildReviewHtml } from "../lib/review-html.js";
 import { TokenBucket } from "../lib/rate.js";
 import { getRoleProfile, buildInstruction } from "../lib/auth.js";
 import { detectModels, saveProvider, writeStrixConfig, NINE_ROUTER_BASE } from "../lib/provider.js";
@@ -27,8 +30,10 @@ Penggunaan:
       Jalankan Strix dalam scope program. Scope-gate dulu, lalu pre-exec
       guard, rate limiter, budget default $${DEFAULT_BUDGET_USD}.
       Tanpa --dry-run dan tanpa binary strix di PATH -> exit 2.
-  bounty review [--approve <id> | --reject <id>]
+  bounty review [--queue] [--approve <id> | --reject <id>] [--export-html [FILE]]
       List kandidat (status candidate); approve/reject per id.
+      --queue: tampilkan antrean kandidat. --export-html: tulis halaman
+      review statis (default eval/review.html) untuk review manual.
   bounty report [--out FILE]
       Render laporan temuan ke stdout (atau file).
   bounty bench [--lab NAME] [--runs N]
@@ -113,23 +118,37 @@ async function cmdRun(args) {
   if (!existsSync(programPath)) {
     console.error(`Program tidak ditemukan: ${programPath}`);
     console.error("Buat programs/<nama>.md dulu (Scope/Allowed/Denied/Budget/Rate/Roles).");
+    try { logAudit({ command: "run", program: String(args.program || "example"), result: "error" }); } catch {}
     return 2;
   }
   const program = loadProgramFile(programPath);
   const target = args.target || (program.allowedHosts[0] ? `https://${program.allowedHosts[0]}/` : "");
-  if (!target) { console.error("Target tidak diberikan dan program tanpa Scope."); return 2; }
+  if (!target) {
+    console.error("Target tidak diberikan dan program tanpa Scope.");
+    try { logAudit({ command: "run", program: program.name, result: "error" }); } catch {}
+    return 2;
+  }
 
   // 1. Scope gate
   const scope = checkScope(program, target);
   console.log(scope.ok ? "Scope OK" : `Scope DITOLAK: ${scope.reason}`);
-  if (!scope.ok) return 2;
+  if (!scope.ok) {
+    try { logAudit({ command: "run", target, program: program.name, result: "blocked" }); } catch {}
+    return 2;
+  }
 
   // 2. Budget + role (auth-minimal)
   const budget = Number(args.budget ?? program.maxBudgetUsd ?? DEFAULT_BUDGET_USD);
+  // Audit trail (P1-1): catat sebelum jalan + sesudah selesai. Gagal tulis
+  // audit tidak menggagalkan run.
+  const auditEntry = { command: "run", target, program: program.name, budget };
+  const auditLog = (result) => { try { logAudit({ ...auditEntry, result }); } catch {} };
+  auditLog("started");
+  const done = (code, result) => { auditLog(result); return code; };
   const role = String(args.role || "low").toLowerCase();
   if (!program.roles.includes(role)) {
     console.error(`Role "${role}" tidak diizinkan program ini (roles: ${program.roles.join(", ")}).`);
-    return 2;
+    return done(2, "blocked");
   }
   const profile = getRoleProfile(program, role);
   console.log(`Budget: $${budget} | Role: ${profile.role} | Rate: ${program.rateLimit}/detik`);
@@ -142,9 +161,9 @@ async function cmdRun(args) {
     if (args["dry-run"]) {
       console.log("[dry-run] Instruksi yang akan dikirim ke Strix:");
       console.log(buildInstruction(program, role));
-      return 0;
+      return done(0, "dry-run");
     }
-    return 2;
+    return done(2, "error");
   }
 
   // 4. Pre-exec guard + rate limiter
@@ -154,14 +173,14 @@ async function cmdRun(args) {
   const guard = checkCommand(cmd, process.cwd());
   if (!guard.allowed) {
     console.error(`Perintah diblokir guard: ${guard.reason}`);
-    return 2;
+    return done(2, "blocked");
   }
   await bucket.acquire();
 
   if (args["dry-run"]) {
     console.log(`[dry-run] strix ditemukan di ${strix}; perintah yang akan jalan: ${cmd}`);
     console.log(buildInstruction(program, role));
-    return 0;
+    return done(0, "dry-run");
   }
 
   // 5. Jalankan Strix (tanpa API berbayar dari wrapper ini — Strix memakai
@@ -172,30 +191,51 @@ async function cmdRun(args) {
     stdio: "inherit",
     env: { ...process.env },
   });
-  if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return 2; }
-  return res.status ?? 0;
+  if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return done(2, "error"); }
+  const code = res.status ?? 0;
+  return done(code, code === 0 ? "ok" : "failed");
 }
 
 function cmdReview(args) {
   const store = new Store();
+  const auditLog = (result, target = "") => { try { logAudit({ command: "review", target, result }); } catch {} };
   try {
     if (args.approve) {
       const row = store.approveCandidate(Number(args.approve));
       console.log(row ? `Kandidat #${row.id} disetujui (approved).` : `Kandidat #${args.approve} tidak ditemukan.`);
+      auditLog(row ? "ok" : "error", `#${args.approve}`);
       return row ? 0 : 2;
     }
     if (args.reject) {
       const row = store.rejectCandidate(Number(args.reject));
       console.log(row ? `Kandidat #${row.id} ditolak (rejected).` : `Kandidat #${args.reject} tidak ditemukan.`);
+      auditLog(row ? "ok" : "error", `#${args.reject}`);
       return row ? 0 : 2;
     }
+    // --export-html [FILE]: halaman review statis (P1-2), default eval/review.html.
+    if (args["export-html"] !== undefined) {
+      const outPath = resolve(typeof args["export-html"] === "string" ? args["export-html"] : "eval/review.html");
+      const list = store.listCandidates(null, "candidate");
+      const html = redact(buildReviewHtml(list));
+      writeFileSync(outPath, html, "utf8");
+      console.log(`Halaman review ditulis ke ${outPath} (${list.length} kandidat).`);
+      auditLog("ok", outPath);
+      return 0;
+    }
+    // --queue (atau tanpa argumen): list antrean kandidat.
     const list = store.listCandidates(null, "candidate");
-    if (list.length === 0) { console.log("Tidak ada kandidat (status candidate)."); return 0; }
-    console.log("Kandidat (status candidate):");
+    if (list.length === 0) {
+      console.log("Tidak ada kandidat (status candidate).");
+      auditLog("ok");
+      return 0;
+    }
+    console.log("Antrean review (status candidate):");
     for (const c of list) {
       console.log(`  #${c.id} [${c.program}] ${c.method} ${c.endpoint} param=${c.param || "-"} kelas=${c.vuln_class} cwe=${c.cwe || "-"}`);
     }
     console.log("Gunakan: bounty review --approve <id> | --reject <id>");
+    console.log("Halaman HTML: bounty review --export-html [file]");
+    auditLog("ok");
     return 0;
   } finally {
     store.close();
@@ -224,12 +264,22 @@ function cmdReport(args) {
       "",
     ];
     const out = lines.join("\n");
+    // Secret-leak guard (P1-1): scan + redact SEBELUM laporan ditulis ke
+    // file/stdout. Laporan yang mengandung secret diblokir isinya (bukan
+    // perintahnya): secret diganti [REDACTED], peringatan dicetak ke stderr.
+    const scanned = scanText(out);
+    if (scanned.found) {
+      const types = [...new Set(scanned.matches.map((m) => m.type))].join(", ");
+      console.error(`Peringatan: laporan mengandung secret (${types}) — di-redact otomatis.`);
+    }
+    const safe = redact(out);
     if (args.out) {
-      writeFileSync(resolve(args.out), out, "utf8");
+      writeFileSync(resolve(args.out), safe, "utf8");
       console.log(`Laporan ditulis ke ${args.out}`);
     } else {
-      process.stdout.write(out);
+      process.stdout.write(safe);
     }
+    try { logAudit({ command: "report", target: args.out ? resolve(args.out) : "stdout", result: "ok" }); } catch {}
     return 0;
   } finally {
     store.close();
