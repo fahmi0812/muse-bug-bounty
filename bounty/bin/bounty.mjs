@@ -18,7 +18,7 @@ import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
 import { checkFailOn, severityFor } from "../lib/failon.js";
-import { color, table, summaryBox, formatUsd, progressBar, severityBadge } from "../lib/ui.js";
+import { color, table, summaryBox, formatUsd, progressBar, severityBadge, phaseLine } from "../lib/ui.js";
 import { searchCode } from "../lib/codesearch.js";
 import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
 import { budgetStatus } from "../lib/cost.js";
@@ -44,6 +44,18 @@ import { decideGraphUpgrade } from "../lib/graph-gate.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
+// node:sqlite memancarkan ExperimentalWarning di setiap invokasi (import
+// store -> node:sqlite). Warning itu bocor ke stderr bahkan pada perintah
+// baca sederhana (--version, findings, review) dan mengotori log/CI.
+// Saring HANYA warning spesifik itu; warning lain tetap dicetak apa adanya.
+// Aman karena process.emitWarning menunda emisi ke nextTick, jadi listener
+// pengganti ini sudah terpasang sebelum warning benar-benar dipancarkan.
+process.removeAllListeners("warning");
+process.on("warning", (w) => {
+  if (w?.name === "ExperimentalWarning" && /sqlite/i.test(w?.message ?? "")) return;
+  process.stderr.write(`${w?.stack || w?.message || w}\n`);
+});
+
 export const VERSION = "1.8.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
@@ -53,61 +65,49 @@ const SKILLS_DIR = process.env.STRIX_SKILLS_DIR || resolve(REPO_ROOT, "skills", 
 
 const HELP = `bounty — muse-bug-bounty wrapper v${VERSION} (zero-dependency, $0)
 
-Penggunaan:
+Penggunaan: bounty <perintah> [opsi]   (jalankan 'bounty --help' untuk detail)
+
+SETUP
   bounty provider [--type openai|anthropic] [--base-url URL] [--model ID]
       Pilih provider/model LLM (interaktif via stdin). Deteksi model dari
       {baseUrl}/models. Simpan ke .bounty/providers/ (0600).
+  bounty install [--strix]
+      Cek/instal Strix via curl resmi (hanya tampilkan perintah, tidak auto-run pipe-to-shell).
+
+ALUR INTI
   bounty run [--program programs/example.md] [--target URL] [--role low|high]
              [--budget 5] [--dry-run] [--targets URL1,URL2]
+      Jalankan Strix dalam scope program. Scope-gate dulu, lalu pre-exec
+      guard, rate limiter, budget default $${DEFAULT_BUDGET_USD}.
+      Tanpa --dry-run dan tanpa binary strix di PATH -> exit 2.
       --targets: antrean multi-target (satu per satu, satu pool budget).
       --fail-on low|medium|high|critical: exit 3 bila ada temuan >= ambang
         (severity heuristik dari kelas vuln — bukan CVSS).
       --pause: bila budget habis di tengah antrean, simpan state jeda
         (.bounty/pause-<ts>.json) dan exit 4. --resume <file>: lanjutkan.
       BOUNTY_RECORD_TIMINGS=1: tulis timings per fase ke .bounty/timings.jsonl.
-  bounty dedup [--program <nama>]
-      Validasi keputusan dedup: kelompokkan kandidat per kunci kanonik,
-      laporkan bila ada kunci yang muncul >1 kali (seharusnya 0).
-  bounty codesearch --dir <dir> --pattern <regex> [--max N]
-      Cari pola di kode (ripgrep bila ada, fallback jalan kaki file).
-      Hanya baca, tidak menulis.
-  bounty graphql --target URL [--program P] [--field user]
-      Fingerprint + introspeksi (atau rebuild clairvoyance bila dimatikan)
-      + tes BOLA/alias/batching. Temuan masuk store sebagai kandidat.
-  bounty cloud --tool takeover|cloud-enum|s3scanner|aws-s3-ls|nuclei-takeovers
-      --target X [--program P]
-      Enum cloud + deteksi takeover tanpa kredensial. Fingerprint takeover
-      wajib verifikasi manual — tidak pernah mengklaim apa pun.
-  bounty reverse --tool ghidra-mcp|rea|jadx --file <binary/APK> --confirm true
-      RE headless gated: file lokal dalam scope saja. Nilai secret tidak
-      pernah masuk temuan.
-  bounty caido [--list] [--filter Q] [--limit N] | --replay <id>
-      Jalur proxy live Caido MCP (read/replay saja). Butuh Caido lokal +
-      server MCP (clone caido/mcp-caido, --mcp-path dist/index.js).
-  bounty view
-      Buka dashboard Strix (strix view) di background.
-      Jalankan Strix dalam scope program. Scope-gate dulu, lalu pre-exec
-      guard, rate limiter, budget default $${DEFAULT_BUDGET_USD}.
-      Tanpa --dry-run dan tanpa binary strix di PATH -> exit 2.
   bounty review [--queue] [--approve <id> | --reject <id>] [--export-html [FILE]]
-  bounty programs
-      List program di programs/*.md (nama, scope, budget, rate).
-  bounty findings [--program <nama>] [--similar <id>]
-      List kandidat + finding tersimpan, opsional filter program.
-      --similar <id>: temuan serupa dari memori (FTS5 + RRF).
-  bounty memory [--list] [--lessons] [--program <nama>]
-      Episode memori per run/review + lesson dari verdict manusia.
-  bounty graph [--program <nama>]
-      Graf aset (view SQL): node/edge, aset terpanas, cakupan open.
-  bounty trace <finding-id>
-      Jejak source -> sink dari chain + evidence yang tercatat.
       List kandidat (status candidate); approve/reject per id.
       --queue: tampilkan antrean kandidat. --export-html: tulis halaman
       review statis (default eval/review.html) untuk review manual.
+  bounty findings [--program <nama>] [--similar <id>]
+      List kandidat + finding tersimpan, opsional filter program.
+      --similar <id>: temuan serupa dari memori (FTS5 + RRF).
   bounty report [--out FILE]
       Render laporan temuan ke stdout (atau file).
-  bounty bench [--lab NAME] [--runs N]
-      Jalankan benchmark (eval/run-bench.mjs bila ada, fallback mock).
+  bounty trace <finding-id>
+      Jejak source -> sink dari chain + evidence yang tercatat.
+  bounty dedup [--program <nama>]
+      Validasi keputusan dedup: kelompokkan kandidat per kunci kanonik,
+      laporkan bila ada kunci yang muncul >1 kali (seharusnya 0).
+
+RECON & SCAN
+  bounty recon --tool subfinder|dnsx|httpx|katana|nuclei-kev|crtsh --target DOMAIN-atau-URL --program programs/<nama>.md [--timeout-ms N]
+      Pipeline recon ProjectDiscovery + crt.sh pasif. subfinder/dnsx/httpx/crtsh
+      mengembalikan daftar aset (bukan klaim vuln); katana/nuclei-kev menyimpan
+      kandidat ke store. Binary tidak ada -> dilewati (bukan error).
+  bounty recon --update-templates
+      Perbarui template nuclei (nuclei -update-templates).
   bounty scan --tool nuclei|dalfox|ffuf|arjun|graphql-cop|gitleaks|trufflehog|osv-scanner|garak|deepteam|jsluice|sourcemapper|garak-agent-breaker|pyrit --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N] [--path DIR] [--model MODEL] [--strategy crescendo|tap] [--objective "..."]
       --path: checkout lokal untuk osv-scanner. --model: model LLM untuk garak/deepteam/agent-breaker/pyrit.
       jsluice: target boleh URL JS atau file JS lokal. sourcemapper: --map-url URL .map, --output-dir DIR.
@@ -115,16 +115,32 @@ Penggunaan:
       Jalankan satu scanner klasik on-demand dalam scope program.
       Binary tidak ada -> dilewati (bukan error). Hasil = kandidat
       (UNVERIFIED) di store; review dulu di 'bounty review'.
-  bounty recon --tool subfinder|dnsx|httpx|katana|nuclei-kev|crtsh --target DOMAIN-atau-URL --program programs/<nama>.md [--timeout-ms N]
-      Pipeline recon ProjectDiscovery + crt.sh pasif. subfinder/dnsx/httpx/crtsh
-      mengembalikan daftar aset (bukan klaim vuln); katana/nuclei-kev menyimpan
-      kandidat ke store. Binary tidak ada -> dilewati (bukan error).
-  bounty recon --update-templates
-      Perbarui template nuclei (nuclei -update-templates).
+  bounty codesearch --dir <dir> --pattern <regex> [--max N]
+      Cari pola di kode (ripgrep bila ada, fallback jalan kaki file).
+      Hanya baca, tidak menulis.
   bounty oast start [--server URL] [--number N] | bounty oast poll | bounty oast stop
       Sesi interactsh OAST untuk blind SSRF/XXE/SQLi/RCE. start jalan di
       foreground (Ctrl-C berhenti), poll dibaca dari terminal lain.
       Payload hanya disuntikkan ke target in-scope.
+
+GRAPHQL / CLOUD / RE / FIRMWARE
+  bounty graphql --target URL [--program P] [--field user]
+      Fingerprint + introspeksi (atau rebuild clairvoyance bila dimatikan)
+      + tes BOLA/alias/batching. Temuan masuk store sebagai kandidat.
+  bounty cloud --tool takeover|cloud-enum|s3scanner|aws-s3-ls|nuclei-takeovers --target X [--program P]
+      Enum cloud + deteksi takeover tanpa kredensial. Fingerprint takeover
+      wajib verifikasi manual — tidak pernah mengklaim apa pun.
+  bounty reverse --tool ghidra-mcp|rea|jadx --file <binary/APK> --confirm true
+      RE headless gated: file lokal dalam scope saja. Nilai secret tidak
+      pernah masuk temuan.
+  bounty firmware --tool binwalk-ng|unblob|cve-bin-tool --file <image> [--program P]
+      Analisis firmware lokal (file saja, bukan URL). EMBA sengaja tidak
+      di-wire (opt-in semalam via Docker, lihat docs/firmware.md).
+  bounty caido [--list] [--filter Q] [--limit N] | --replay <id>
+      Jalur proxy live Caido MCP (read/replay saja). Butuh Caido lokal +
+      server MCP (clone caido/mcp-caido, --mcp-path dist/index.js).
+
+PLATFORM (read-only, tanpa auto-submit)
   bounty platform scope --platform hackerone|bugcrowd --handle NAMA
       Lihat scope program (read-only, token dari env HACKERONE_TOKEN /
       HACKERONE_USERNAME / BUGCROWD_TOKEN).
@@ -135,11 +151,18 @@ Penggunaan:
   bounty platform sync-scope --platform hackerone|bugcrowd --handle NAMA --program programs/<nama>.md
       Bandingkan scope platform vs program lokal (hanya bandingkan,
       tidak menulis file).
+
+MEMORI, GRAF & POLA
+  bounty programs
+      List program di programs/*.md (nama, scope, budget, rate).
+  bounty memory [--list] [--lessons] [--program <nama>]
+      Episode memori per run/review + lesson dari verdict manusia.
+  bounty graph [--program <nama>]
+      Graf aset (view SQL): node/edge, aset terpanas, cakupan open.
   bounty patterns [--skill <nama>]
       Pustaka pola laporan: total, bersitasi, per skill (+ bonus router).
-  bounty firmware --tool binwalk-ng|unblob|cve-bin-tool --file <image> [--program P]
-      Analisis firmware lokal (file saja, bukan URL). EMBA sengaja tidak
-      di-wire (opt-in semalam via Docker, lihat docs/firmware.md).
+
+GERBANG CI & BENCHMARK
   bounty promptfoo-gate --results <hasil.json> [--min-pass-rate 0.8]
       Gerbang CI red-team: baca hasil promptfoo eval, lolos hanya bila
       pass rate >= ambang. Tanpa hasil/kunci -> gagal (bukan lolos diam-diam).
@@ -147,8 +170,12 @@ Penggunaan:
       Keputusan upgrade graf/memori: hanya "upgrade" bila baseline
       membuktikan planning/state adalah bottleneck; tanpa baseline
       jawabannya selalu "tetap SQL".
-  bounty install [--strix]
-      Cek/instal Strix via curl resmi (hanya tampilkan perintah, tidak auto-run pipe-to-shell).
+  bounty bench [--lab NAME] [--runs N]
+      Jalankan benchmark (eval/run-bench.mjs bila ada, fallback mock).
+
+LAINNYA
+  bounty view
+      Buka dashboard Strix (strix view) di background.
   bounty --help | bounty --version
 
 Aturan keras: scope-gate, budget, tanpa submit/bayar/deposit, tanpa API berbayar
@@ -189,6 +216,14 @@ function findBinary(name) {
 
 function ask(rl, q) {
   return new Promise((resolve) => rl.question(q, (a) => resolve(a.trim())));
+}
+
+// Tampilan scope gate yang seragam: OK -> stdout (hijau, gaya fase),
+// DITOLAK -> stderr (merah) karena itu kondisi gagal + exit 2.
+function printScope(ok, reason) {
+  if (ok) { console.log(color("Scope OK", "green")); return true; }
+  console.error(color(`Scope DITOLAK: ${reason ?? ""}`.trim(), "red"));
+  return false;
 }
 
 async function cmdProvider(args) {
@@ -262,7 +297,7 @@ async function runSingleTarget(args, targetOverride = null) {
 
   // 1. Scope gate
   const scope = checkScope(program, target);
-  console.log(scope.ok ? color("Scope OK", "green") : color(`Scope DITOLAK: ${scope.reason}`, "red"));
+  printScope(scope.ok, scope.reason);
   if (!scope.ok) {
     try { logAudit({ command: "run", target, program: program.name, result: "blocked" }); } catch {}
     return 2;
@@ -283,7 +318,7 @@ async function runSingleTarget(args, targetOverride = null) {
     return { code: done(2, "blocked"), usd: 0, added: 0, findings: [] };
   }
   const profile = getRoleProfile(program, role);
-  console.log(`Budget: $${budget} | Role: ${profile.role} | Rate: ${program.rateLimit}/detik`);
+  console.log(phaseLine("Budget", `${formatUsd(budget)} | Role: ${profile.role} | Rate: ${program.rateLimit}/detik`));
 
   // 3. Strix binary check
   const strix = findBinary("strix");
@@ -563,12 +598,14 @@ function cmdPrograms() {
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith(".md")).sort(); } catch { console.error("Folder programs/ tidak ditemukan."); return 2; }
   if (files.length === 0) { console.log("Tidak ada program di programs/."); return 0; }
-  console.log("Program:");
   const rows = [];
   for (const f of files) {
     try {
       const prog = loadProgramFile(join(dir, f));
-      rows.push([prog.name || f.replace(/\.md$/, ""), prog.allowedHosts.join(", ") || "-", formatUsd(prog.maxBudgetUsd ?? 5), `${prog.rateLimit}/detik`, prog.roles.join(", ")]);
+      // Nama kanonik sering diambil dari judul H1 "# Program: X" — buang
+      // prefiks "Program:" agar tidak menduplikasi header kolom "Program".
+      const label = (prog.name || f.replace(/\.md$/, "")).replace(/^Program:\s*/i, "");
+      rows.push([label, prog.allowedHosts.join(", ") || "-", formatUsd(prog.maxBudgetUsd ?? 5), `${prog.rateLimit}/detik`, prog.roles.join(", ")]);
     } catch (e) { rows.push([f, "(gagal dibaca)", "-", "-", "-"]); }
   }
   console.log(table(rows, ["Program", "Scope", "Budget", "Rate", "Roles"]));
@@ -762,7 +799,7 @@ async function cmdScan(args) {
   // URL ditangani lib masing-masing; file lokal adalah input pengguna.
   const isLocalJs = (tool === "jsluice" && !/^https?:\/\//i.test(String(target))) || tool === "mobsf" || tool === "jadx";
   const scope = isLocalJs ? { ok: true } : checkScope(program, target);
-  console.log(scope.ok ? "Scope OK" : `Scope DITOLAK: ${scope.reason}`);
+  printScope(scope.ok, scope.reason);
   if (!scope.ok) {
     try { logAudit({ command: "scan", tool, target, program: program.name, result: "blocked" }); } catch {}
     return 2;
@@ -861,7 +898,7 @@ async function cmdRecon(args) {
   else if (tool === "nuclei-kev") result = runNucleiKev(target, { program, timeoutMs });
   else if (tool === "crtsh") result = await crtsh(target, { program });
   if (result.error) { console.error(result.error); return 2; }
-  if (result.blocked) { console.log(`Scope DITOLAK: ${result.reason}`); return 2; }
+  if (result.blocked) { printScope(false, result.reason); return 2; }
   if (result.skipped) { console.log(`Dilewati: ${result.reason}`); return 0; }
   const results = result.results ?? [];
   console.log(`[${tool}] ${results.length} hasil dalam ${result.time_ms} ms.`);
@@ -1036,6 +1073,7 @@ async function cmdGraphql(args) {
   for (const c of bola.checks ?? []) console.log(`  - ${c.name}: ${c.result}`);
   const { added, total } = storeFindings(program, bola.findings ?? []);
   console.log(`GraphQL: ${total} temuan kandidat, ${added} baru masuk store.`);
+  if (added > 0) console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
   return 0;
 }
 
@@ -1068,6 +1106,7 @@ function cmdCloud(args) {
   if (result.skipped) { console.log(`Dilewati: ${result.reason}`); return 0; }
   const { added, total } = storeFindings(program, result.findings ?? []);
   console.log(`Cloud [${tool}]: ${total} temuan kandidat, ${added} baru masuk store.`);
+  if (added > 0) console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
   return 0;
 }
 
@@ -1089,6 +1128,7 @@ async function cmdReverse(args) {
   const programName = args.program ? loadProgramFile(args.program).name : "reverse";
   const { added, total } = storeFindings({ name: programName }, result.findings ?? []);
   console.log(`RE [${tool}]: ${total} temuan kandidat, ${added} baru masuk store (nilai secret tidak pernah disimpan).`);
+  if (added > 0) console.log(`Lihat antrean: bounty review  |  bounty findings --program ${programName}`);
   return 0;
 }
 
@@ -1146,6 +1186,7 @@ async function cmdFirmware(args) {
   console.log(`${tool}: ${result.findings?.length ?? 0} temuan (${result.duplicates ?? 0} duplikat dibuang).`);
   const stored = storeFindings(program, result.findings ?? []);
   console.log(`Disimpan ke bounty.db: ${stored.added} kandidat baru.`);
+  if (stored.added > 0) console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
   return 0;
 }
 
@@ -1278,6 +1319,33 @@ function cmdInstall(args) {
   return 0;
 }
 
+const COMMANDS = [
+  "provider", "run", "view", "review", "programs", "findings", "memory",
+  "graph", "trace", "report", "bench", "scan", "recon", "oast", "platform",
+  "patterns", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
+  "firmware", "promptfoo-gate", "graph-gate", "install",
+];
+
+// Jarak edit Levenshtein untuk saran "maksud Anda ...".
+function editDistance(a, b) {
+  const m = a.length, n = b.length;
+  const d = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) d[i][0] = i;
+  for (let j = 0; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+  }
+  return d[m][n];
+}
+
+function suggestCommand(cmd) {
+  const ranked = COMMANDS.map((c) => ({ c, d: editDistance(String(cmd), c) })).sort((a, b) => a.d - b.d);
+  const best = ranked[0];
+  return best && best.d <= Math.max(2, Math.floor(String(cmd).length / 2)) ? best.c : null;
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const args = parseArgs(argv);
   const cmd = args._[0];
@@ -1316,10 +1384,14 @@ export async function main(argv = process.argv.slice(2)) {
     case "promptfoo-gate": return cmdPromptfooGate(args);
     case "graph-gate": return cmdGraphGate(args);
     case "install": return cmdInstall(args);
-    default:
-      console.error(`Perintah tidak dikenal: ${cmd}\n`);
-      process.stdout.write(HELP);
+    default: {
+      console.error(`Perintah tidak dikenal: ${cmd}`);
+      const hint = suggestCommand(cmd);
+      if (hint) console.error(`Maksud Anda: bounty ${hint}?`);
+      console.error(`\nPerintah tersedia: ${COMMANDS.join(", ")}.`);
+      console.error("Jalankan 'bounty --help' untuk detail tiap perintah.");
       return 2;
+    }
   }
 }
 

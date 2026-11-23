@@ -73,7 +73,7 @@ export function table(rows, headers, opts = {}) {
 export function progressBar(done, total, width = 20) {
   const w = Math.max(0, Math.floor(Number(width) || 0));
   const t = Number(total);
-  if (!Number.isFinite(t) || t <= 0) return `[${"░".repeat(20)}] 0/0`;
+  if (!Number.isFinite(t) || t <= 0) return `[${"░".repeat(w)}] 0/0`;
   const d = Math.min(Math.max(0, Math.floor(Number(done) || 0)), t);
   const filled = Math.round((d / t) * w);
   return `[${"█".repeat(filled)}${"░".repeat(w - filled)}] ${d}/${t}`;
