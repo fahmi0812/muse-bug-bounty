@@ -100,6 +100,28 @@ exit 2
   }
 });
 
+test("run nyata: Strix crash saat start (traceback, exit 1) dilaporkan sebagai error, tanpa ringkasan sukses", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-strix-crash-"));
+  // Kasus nyata 24 Nov 2026: Strix crash ValidationError web_search_provider
+  // ('custom') saat pull_docker_image — wrapper lama mencetak ringkasan
+  // sukses 0 temuan. HOME diarahkan ke temp dir supaya pre-flight config
+  // tidak membaca ~/.strix sungguhan.
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+echo "Traceback (most recent call last):" >&2
+echo "pydantic_core._pydantic_core.ValidationError: 1 validation error for IntegrationSettings" >&2
+echo "web_search_provider" >&2
+echo "  Input should be 'auto', 'perplexity' or 'exa' [type=literal_error, input_value='custom', input_type=str]" >&2
+echo "[PYI-8476:ERROR] Failed to execute script 'main' due to unhandled exception!" >&2
+exit 1
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/", "--program", "programs/example.md"], { cwd: ROOT, env, encoding: "utf8" });
+  assert.equal(r.status, 2, r.stderr + r.stdout);
+  assert.match(r.stderr + r.stdout, /Strix gagal jalan/);
+  assert.doesNotMatch(r.stdout, /Ringkasan run/);
+});
+
 test("readStrixArtifacts: run.json + vulnerabilities.json jadi sumber utama", () => {
   const dir = mkdtempSync(join(tmpdir(), "bounty-artifacts-"));
   const runDir = join(dir, "strix_runs", "run-1");

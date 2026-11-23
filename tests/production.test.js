@@ -60,9 +60,9 @@ test('production: TEAM.md, SECURITY.md, CONTRIBUTING.md ada dan tidak kosong', (
   assert.match(read('CONTRIBUTING.md'), /REPLACE-ME/);
 });
 
-test('production: package.json version 1.13.2', () => {
+test('production: package.json version 1.13.3', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '1.13.2');
+  assert.equal(pkg.version, '1.13.3');
 });
 
 test('production: docs P2 ada dan tidak kosong', () => {

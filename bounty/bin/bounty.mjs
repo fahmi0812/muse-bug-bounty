@@ -4,7 +4,9 @@
 import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync, mkdirSync, appendFileSync, realpathSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
+import { homedir } from "node:os";
 import { createInterface } from "node:readline";
+import { checkStrixConfig, STRIX_CONFIG_KEY } from "../lib/strix-config.js";
 import { Store } from "../lib/store.js";
 import { parseProgram, loadProgramFile, checkScope } from "../lib/scope.js";
 import { checkCommand } from "../lib/guard.js";
@@ -60,7 +62,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.2";
+export const VERSION = "1.13.3";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -619,6 +621,20 @@ async function runSingleTarget(args, targetOverride = null) {
     return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
   }
 
+  // 3b. Pre-flight config Strix: nilai STRIX_WEB_SEARCH_PROVIDER tak
+  // valid ('custom') bikin Strix crash saat start (ValidationError) —
+  // padahal run belum mulai. Nilai di file dihapus otomatis (fallback
+  // 'auto'); nilai dari env shell tidak bisa diperbaiki — batalkan run
+  // dengan petunjuk yang persis.
+  const strixConfig = checkStrixConfig(join(homedir(), ".strix", "cli-config.json"), process.env);
+  if (strixConfig.fixed) console.log(`Config Strix diperbaiki: ${STRIX_CONFIG_KEY}='${strixConfig.value}' dihapus dari ~/.strix/cli-config.json (bukan nilai valid — fallback 'auto').`);
+  if (!strixConfig.ok) {
+    console.error(`Config Strix tidak valid: ${STRIX_CONFIG_KEY}='${strixConfig.value}' (${strixConfig.source === "env" ? "dari env shell" : "dari ~/.strix/cli-config.json"}) — nilai valid: auto, perplexity, exa.`);
+    if (strixConfig.source === "env") console.error(`Perbaiki: unset ${STRIX_CONFIG_KEY}  (atau set ke auto), lalu ulangi run.`);
+    else console.error(`Perbaiki: hapus kunci ${STRIX_CONFIG_KEY} dari ~/.strix/cli-config.json, lalu ulangi run.`);
+    return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
+  }
+
   // 4. Pre-exec guard + rate limiter
   // Rate limiter: TokenBucket menegakkan rate request WRAPPER (pre/post
   // run). Request internal Strix TIDAK lewat bucket ini — Strix dibatasi
@@ -687,6 +703,16 @@ async function runSingleTarget(args, targetOverride = null) {
   if (/unrecognized arguments|usage: strix|strix: error:/i.test(combinedOut)) {
     console.error("\nStrix menolak argumen perintah (flag tidak dikenal di versi Strix terinstal).");
     console.error("Ini bug wrapper, bukan target — perbaiki flag di bounty/bin/bounty.mjs, lalu ulangi run.");
+    return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
+  }
+  // Strix crash saat start (mis. config tidak valid, traceback Python)
+  // juga keluar non-zero dan tidak menghasilkan temuan — jangan cetak
+  // ringkasan sukses. Exit 2 yang sah (temuan ditemukan) tidak punya
+  // traceback, jadi tetap lolos sebagai sukses.
+  const crashed = (code !== 0 && code !== 2) || /Traceback \(most recent call last\)|validation error for \w+Settings|Failed to execute script/i.test(combinedOut);
+  if (crashed) {
+    console.error(`\nStrix gagal jalan (exit ${code}).`);
+    console.error("Lihat traceback di atas — bila menyebut ValidationError / cli-config.json, perbaiki config Strix lalu ulangi run.");
     return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
   }
   const strixOk = code === 0 || code === 2;

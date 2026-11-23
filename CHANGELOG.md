@@ -2,6 +2,12 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.3] — 2026-11-24
+
+### Fixed
+- **`bounty run` — Strix crash saat start karena config tak valid kini diperbaiki otomatis sebelum run.** Run dari degre lolos guard dan flag sudah benar, tapi Strix crash di `pull_docker_image` → `load_settings`: `ValidationError: IntegrationSettings.web_search_provider — Input should be 'auto', 'perplexity' or 'exa'` karena nilainya `'custom'`. Nilai itu BUKAN dari wrapper (writeStrixConfig hanya menulis 3 kunci LLM) — asalnya dari `~/.strix/cli-config.json` (blok `{"env": ...}` warisan Strix lama) atau env shell; diverifikasi dari upstream `strix/config/settings.py` (Literal auto|perplexity|exa, default auto, alias `STRIX_WEB_SEARCH_PROVIDER`) + `strix/config/loader.py` (env menang, lalu file, lalu default). Kini `bounty run` memeriksa config sebelum spawn: nilai tak valid di FILE dihapus otomatis (fallback `auto`; `'custom'` tidak bisa jalan di Strix mana pun) dan dilaporkan; nilai tak valid dari ENV SHELL membatalkan run dengan petunjuk `unset` yang persis.
+- **Strix crash tidak lagi dicetak sebagai ringkasan sukses 0 temuan.** Bila Strix keluar non-zero (selain exit 2 temuan) atau output mengandung traceback/`validation error for …Settings`/`Failed to execute script`, run dilaporkan sebagai error (exit 2, tanpa ringkasan sukses, tanpa mencatat run) dengan pesan "Strix gagal jalan (exit N)".
+
 ## [1.13.2] — 2026-11-24
 
 ### Fixed
