@@ -21,6 +21,8 @@ fi
 
 node --version
 strix --version 2>/dev/null || echo "(strix --version tidak mengembalikan versi — lanjut)"
+echo "== Langkah 0: cek flag Strix (informasi saja — flag --max-budget-usd belum terverifikasi) =="
+strix --help 2>&1 | grep -E "max-budget|max-turns" || echo "(tidak menemukan flag max-budget/max-turns di strix --help — periksa manual sebelum percaya budget)"
 echo "== Langkah 1/3: lab lokal, 3 run, baseline vs bounty =="
 npm run measure-baseline -- --runs=3 --mode=both
 
