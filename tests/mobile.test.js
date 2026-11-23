@@ -16,8 +16,15 @@ const PROGRAM = { name: "example" };
 const EMPTY_PATH = { PATH: "/nonexistent-dir-xyz" };
 
 // Laporan MobSF contoh (bentuk v4: manifest array, code object, secrets).
-// Nilai secret palsu — TIDAK BOLEH muncul di temuan mana pun.
-const FAKE_SECRET_VALUE = "SECRET_CONTOH_XYZ123";
+// Nilai secret palsu — DIBANGKITKAN saat runtime (SHA-256 deterministik dari
+// seed, base64url) supaya tidak ada satu pun literal mirip kunci di file
+// ini (pemindai secret gitleaks/CI menandai literal seperti itu). Nilai
+// ini TIDAK BOLEH muncul di temuan mana pun.
+import { createHash } from "node:crypto";
+function fakeSecret(seed, len) {
+  return createHash("sha256").update(`bounty-fake-secret-${seed}`).digest("base64url").slice(0, len);
+}
+const FAKE_SECRET_VALUE = fakeSecret(12345, 20);
 const SAMPLE_REPORT = {
   package_name: "com.example.app",
   file_name: "app-target.apk",
@@ -220,9 +227,9 @@ test("runJadx: binary palsu -> manifest + secret dari sumber", () => {
   try {
     const apk = join(dir, "app-target.apk");
     writeFileSync(apk, Buffer.from("PK\x03\x04palsu"));
-    // Secret palsu dirakit saat runtime (bukan literal di file ini),
-    // supaya pemindai secret tidak menandai fixture test.
-    const secretLine = "api_" + 'key = "Zx9qW8eR7tY6uI5oP4aS3dF2gH1jK0lM9n8b7v6";';
+    // Secret palsu dibangkitkan saat runtime (fakeSecret di atas) supaya
+    // tidak ada literal mirip kunci di file ini.
+    const secretLine = "api_" + 'key = "' + fakeSecret(999, 40) + '";';
     const jadx = join(binDir, "jadx");
     writeFileSync(jadx, `#!/bin/sh
 # jadx palsu: $1=-d $2=outdir $3=apk

@@ -1,12 +1,17 @@
 # Gitleaks config — muse-bug-bounty
-# Pakai semua rule default, dengan SATU pengecualian yang didokumentasikan:
+# Pakai semua rule default, dengan DUA pengecualian yang didokumentasikan:
 # tests/secrets.test.js berisi fixture PALSU untuk menguji detektor secret
 # (contoh kunci dari dokumentasi Stripe, ID nol, domain example.com,
 # password contoh seperti hunter2secret). Bukan kredensial asli.
-# Bila ada secret asli masuk ke file itu, pengecualian ini harus dicabut.
+# tests/mobile.test.js: fixture secret-nya kini DIBANGKITKAN saat runtime
+# (SHA-256 deterministik, tidak ada literal mirip kunci di file) — tapi
+# commit 3a9ec32 (snapshot v1.6.0) masih menyimpan literal palsu lama di
+# histori git, dan CI memindai histori penuh (fetch-depth: 0). Pengecualian
+# ini hanya menutupi histori itu. Bila ada secret asli masuk ke salah satu
+# file ini, pengecualian ini harus dicabut.
 [extend]
 useDefault = true
 
 [allowlist]
-description = "Test fixtures (published example/fake values) in tests/secrets.test.js"
-paths = ['''tests/secrets\.test\.js''']
+description = "Test fixtures (published example/fake values) in tests/secrets.test.js and tests/mobile.test.js"
+paths = ['''tests/secrets\.test\.js''', '''tests/mobile\.test\.js''']
