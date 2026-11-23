@@ -78,7 +78,11 @@
       "bypass",
       "otp",
       "password reset",
-      "session"
+      "session",
+      "weak",
+      "credentials",
+      "credential",
+      "hardcoded"
     ],
     "name": "hunt-auth-bypass",
     "vuln_class": "Authentication Bypass",
@@ -262,7 +266,11 @@
       "credential",
       "hardcoded",
       "bundle",
-      "source"
+      "source",
+      "sensitive",
+      "data",
+      "exposure",
+      "disclosure"
     ],
     "name": "hunt-secrets",
     "vuln_class": "Exposed Secrets",
@@ -773,7 +781,11 @@
       "model",
       "tool",
       "rag",
-      "system prompt"
+      "system prompt",
+      "sensitive",
+      "exfiltration",
+      "leakage",
+      "retrieval"
     ],
     "when": "Konten pengguna diikuti model sebagai perintah atau output model dipercaya mentah."
   },
@@ -1258,5 +1270,24 @@
       "verification"
     ],
     "when": "Deteksi saja: form tanpa penegakan CAPTCHA. Bypass/solver DILARANG."
+  },
+  {
+    "name": "hunt-dos",
+    "file": "hunt/hunt-dos.md",
+    "vuln_class": "Denial of Service / Unrestricted Resource Consumption",
+    "cwe": "CWE-400",
+    "keywords": [
+      "dos",
+      "denial",
+      "service",
+      "resource",
+      "consumption",
+      "exhaustion",
+      "unrestricted",
+      "query",
+      "batching",
+      "rate"
+    ],
+    "when": "Satu request/query bisa menghabiskan resource server (CPU, memori, koneksi) sampai layanan lumpuh."
   }
 ]

@@ -148,7 +148,7 @@ test("planner: recordSurface tanpa tabel memory_coverage -> no-op tanpa throw", 
   }
 });
 
-test("planner: coverageSummary pct benar (18 examined dari 72 total -> 25)", () => {
+test("planner: coverageSummary pct benar (18 examined dari 73 total -> 25)", () => {
   recordSurface(store.db, "p1", "/api/satu");
   for (const cls of SURFACE_CLASSES.slice(0, 18)) {
     recordCoverage(store.db, "p1", "/api/satu", cls, "examined");

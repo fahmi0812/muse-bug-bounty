@@ -58,7 +58,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.11.0";
+export const VERSION = "1.12.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -107,7 +107,8 @@ RECON & SCAN
   bounty recon --tool subfinder|dnsx|httpx|katana|nuclei-kev|crtsh --target DOMAIN-atau-URL --program programs/<nama>.md [--timeout-ms N]
       Pipeline recon ProjectDiscovery + crt.sh pasif. subfinder/dnsx/httpx/crtsh
       mengembalikan daftar aset (bukan klaim vuln); katana/nuclei-kev menyimpan
-      kandidat ke store. Binary tidak ada -> dilewati (bukan error).
+      kandidat ke store. Hasil recon otomatis didaftarkan sebagai surface
+      untuk bounty plan (max 20/run). Binary tidak ada -> dilewati (bukan error).
   bounty recon --update-templates
       Perbarui template nuclei (nuclei -update-templates).
   bounty scan --tool nuclei|dalfox|ffuf|arjun|graphql-cop|gitleaks|trufflehog|osv-scanner|garak|deepteam|jsluice|sourcemapper|garak-agent-breaker|pyrit --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N] [--path DIR] [--model MODEL] [--strategy crescendo|tap] [--objective "..."]
@@ -922,6 +923,20 @@ async function cmdRecon(args) {
   console.log(`[${tool}] ${results.length} hasil dalam ${result.time_ms} ms.`);
   for (const r of results.slice(0, 20)) console.log(`  ${typeof r === "string" ? r : JSON.stringify(r)}`);
   if (results.length > 20) console.log(`  ... dan ${results.length - 20} lagi.`);
+  // v1.12: daftarkan surface hasil recon ke planner (max 20/run) supaya
+  // `bounty plan` bisa merencanakan hunt ke host/URL yang baru ditemukan
+  // — bukan hanya yang sudah punya kandidat. recordSurface hanya menulis
+  // baris yang belum ada, jadi pemanggilan ulang aman.
+  const surfaces = [...new Set(results.map((r) => (typeof r === "string" ? r : r?.url ?? r?.endpoint ?? r?.subdomain ?? r?.host ?? "")).filter(Boolean))].slice(0, 20);
+  if (surfaces.length > 0) {
+    const storeS = new Store();
+    try {
+      let added = 0;
+      for (const s of surfaces) { if (recordSurface(storeS.db, program.name, s) > 0) added += 1; }
+      if (added > 0) console.log(`${added} surface baru didaftarkan ke planner. Lihat: bounty plan --program ${program.name}`);
+    } catch (e) { console.error(`Peringatan: gagal mendaftarkan surface: ${e.message}`); }
+    finally { storeS.close(); }
+  }
   const findings = result.findings ?? [];
   if (!findings.length) return 0;
   const store = new Store();

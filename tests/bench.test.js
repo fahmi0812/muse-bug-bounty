@@ -105,6 +105,15 @@ test('bench: expectedSkillFor memetakan kelas vuln ke hunt-<kelas>', () => {
   assert.equal(expectedSkillFor('Path Traversal'), 'hunt-path-traversal');
   assert.equal(expectedSkillFor('CSRF / Missing Authorization'), 'hunt-csrf');
   assert.equal(expectedSkillFor('GraphQL BOLA / Broken Object Level Authorization'), 'hunt-api-bola');
+  // v1.12: 3 kelas juice-shop yang tadinya tak terpetakan (fallback hunt-<token>).
+  assert.equal(expectedSkillFor('Weak Credentials / Hardcoded'), 'hunt-auth-bypass');
+  assert.equal(expectedSkillFor('Sensitive Data Exposure'), 'hunt-secrets');
+  assert.equal(expectedSkillFor('DoS via query / Unrestricted Resource Consumption'), 'hunt-dos');
+  assert.equal(expectedSkillFor('GraphQL Query Batching / DoS'), 'hunt-graphql'); // graphql menang atas dos
+  // v1.12 (lanjutan): mapping yang tadinya jatuh ke fallback hunt-<token>.
+  assert.equal(expectedSkillFor('Local File Inclusion'), 'hunt-lfi');
+  assert.equal(expectedSkillFor('Excessive Data Exposure'), 'hunt-secrets');
+  assert.equal(expectedSkillFor('Broken Function Level Authorization'), 'hunt-broken-access');
 });
 
 test('bench: routerAccuracy hit rate dengan router nyata + oracle Juice Shop', () => {

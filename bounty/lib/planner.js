@@ -6,13 +6,14 @@
 // (max 3 kelas per surface) supaya satu surface tidak dibanjiri.
 //
 // Universe kelas: semua vuln_class unik dari skills/bounty/skills-index.json
-// (89 entri, dibaca 23 Nov 2026) KECUALI 14 skill meta/metodologi yang
-// bukan kelas vuln dan tidak bisa "di-hunt" di sebuah endpoint:
+// (90 entri, dibaca 23 Nov 2026 — hunt-dos masuk di v1.12) KECUALI 14 skill
+// meta/metodologi yang bukan kelas vuln dan tidak bisa "di-hunt" di sebuah
+// endpoint:
 //   "Attack Surface Mapping", "Audit Context Building", "Audit Review",
 //   "Evidence Hygiene", "Ghostsecurity Loop", "JS Bundle Analysis",
 //   "Methodology", "Navigation", "PR Security Review", "Reporting",
 //   "SQL Injection Wordlist", "Triage", "Verification", "White-box Tracing".
-// Hasilnya 72 kelas. Bila index bertambah, tambah kelas baru di sini
+// Hasilnya 73 kelas. Bila index bertambah, tambah kelas baru di sini
 // (hardcode sengaja — planner tidak membaca file saat runtime).
 //
 // Status per (surface, kelas):
@@ -48,6 +49,7 @@ export const SURFACE_CLASSES = [
   "Cross-Site Request Forgery",
   "Cross-Site Scripting",
   "DOM Cross-Site Scripting",
+  "Denial of Service / Unrestricted Resource Consumption",
   "Entra ID / M365 Misconfiguration",
   "Error Message Disclosure",
   "Exposed Secrets",

@@ -1,10 +1,14 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.11.0 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.12.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
 > (Docker/Strix/provider/PowerShell) dan ditulis jujur di sana.
+
+> **v1.12.0 — perbaikan kecil (2026-11-23):** router accuracy mock 100%
+> semua lab (skill baru hunt-dos, 8 pemetaan kelas, pengayaan keyword),
+> promosi penuh track-record, recon otomatis daftarkan surface ke planner.
 
 > **v1.11.0 — ingatan belajar (2026-11-23):** `bounty/lib/learning.js` —
 > track record presisi per skill dari verdict reviewer (router naik/turun

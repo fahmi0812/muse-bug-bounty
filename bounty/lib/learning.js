@@ -8,19 +8,14 @@
 //      sebagai sinyal keempat di findSimilarV2, di samping BM25 FTS5 +
 //      cosine TF-IDF + boost kelas/CWE.
 //
-// CATATAN INTEGRASI (baca sebelum menyambung ke bounty.mjs/bench.js):
-// - scoreAll/topWithFallback di router.js bersifat LOKAL (tidak diekspor),
-//   jadi routeWithTrackRecord dibangun di atas routeWithLessons yang
-//   diekspor (skor keyword + nudge lesson + bonus pola bersitasi yang
-//   sama persis), lalu bonus track-record diterapkan ke 5 teratas dan
-//   diurutkan ulang. Konsekuensi: track-record hanya bisa mengurutkan
-//   ulang skill yang SUDAH masuk top-5 keyword; skill peringkat 6
-//   tidak bisa dipromosikan. Bila promosi penuh diinginkan, ekspor
-//   scoreAll dari router.js dulu (perubahan satu baris di sana).
+// CATATAN INTEGRASI (v1.12): scoreAll/topWithFallback/scoreWithBonuses
+// di router.js kini diekspor, jadi routeWithTrackRecord menerapkan bonus
+// track-record ke SEMUA skill sebelum top-5 dipotong — skill peringkat 6
+// bisa dipromosikan (batas v1.11 sudah tidak berlaku).
 // - tokenize/cosineTfIdf di memory.js juga lokal, jadi helper kecil itu
 //   ditulis ulang di sini untuk findSimilarV2 (rumus sama persis).
 
-import { routeWithLessons } from "./router.js";
+import { scoreWithBonuses, topWithFallback } from "./router.js";
 
 // --- Vektor hash ringan (feature hashing) ---
 
@@ -127,19 +122,19 @@ const TRACK_CAP = 0.3;
 // Perluasan routeWithLessons: skor akhir = skor keyword + nudge lesson
 // v1.2 (±0.15, cap ±0.45, rumus tidak diubah) + bonus track-record
 // (weight skill x 0.3, clamp ±0.3). Bonus hanya bila weight != 0.
+// v1.12: bonus diterapkan ke SEMUA skill sebelum top-5 dipotong, jadi
+// skill peringkat 6 bisa dipromosikan ke top-5.
 // Tanpa lessons + tanpa trackRecord + tanpa patterns -> hasil
-// deepEqual-identik dengan routeSkills() (jalur ini mengembalikan hasil
-// routeWithLessons apa adanya, tanpa pengurutan ulang).
+// deepEqual-identik dengan routeSkills().
 export function routeWithTrackRecord(contextText, lessons = [], trackRecord = null, patterns = null, skills = null) {
-  const base = routeWithLessons(contextText, lessons, patterns, skills);
+  const ctx = String(contextText ?? "").trim();
   const record = normTrackRecord(trackRecord);
   const weights = new Map();
   for (const [name, rec] of Object.entries(record)) {
     const w = typeof rec === "number" ? rec : Number(rec?.weight ?? 0);
     if (Number.isFinite(w) && w !== 0) weights.set(name, w);
   }
-  if (weights.size === 0) return base;
-  const scored = base.map((entry) => {
+  const scored = scoreWithBonuses(ctx, lessons, patterns, skills).map((entry) => {
     const w = weights.get(entry.name);
     if (w === undefined) return entry;
     const bonus = Math.round(Math.max(-TRACK_CAP, Math.min(TRACK_CAP, w * TRACK_STEP)) * 100) / 100;
@@ -147,12 +142,7 @@ export function routeWithTrackRecord(contextText, lessons = [], trackRecord = nu
     const score = Math.round((entry.score + bonus) * 100) / 100;
     return { ...entry, score, reason: `${entry.reason} +track ${bonus > 0 ? "+" : ""}${bonus}` };
   });
-  // Fallback triage-generic (bila ada) tetap di posisi pertama —
-  // jangan sampai bonus menggeser arti "tidak ada skill yang cocok".
-  const head = scored[0]?.name === "triage-generic" ? scored.slice(0, 1) : [];
-  const rest = head.length ? scored.slice(1) : scored;
-  rest.sort((a, b) => b.score - a.score);
-  return [...head, ...rest];
+  return topWithFallback(scored, ctx);
 }
 
 // --- findSimilarV2: BM25 + TF-IDF + vektor hash + boost ---

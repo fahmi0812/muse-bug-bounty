@@ -47,7 +47,7 @@ function scoreSkill(contextText, skill) {
   return { score, matched };
 }
 
-function scoreAll(contextText, skills) {
+export function scoreAll(contextText, skills) {
   const ctx = String(contextText ?? "").trim();
   return (skills ?? loadSkillsIndex()).map((skill) => {
     const { score, matched } = scoreSkill(ctx, skill);
@@ -60,7 +60,7 @@ function scoreAll(contextText, skills) {
   });
 }
 
-function topWithFallback(scored, ctx) {
+export function topWithFallback(scored, ctx) {
   const sorted = [...scored].sort((a, b) => b.score - a.score);
   const top = sorted.slice(0, 5);
   const best = top[0]?.score ?? 0;
@@ -129,10 +129,13 @@ function lessonBonus(skill, lessons) {
   return Math.max(-LESSON_CAP, Math.min(LESSON_CAP, bonus));
 }
 
-export function routeWithLessons(contextText, lessons = [], patterns = null, skills = null) {
+// Skor keyword + bonus lesson/pola untuk SEMUA skill (belum dipotong
+// top-5) — dipakai routeWithLessons dan routeWithTrackRecord (v1.12:
+// promosi penuh, skill peringkat 6 bisa naik ke top-5 lewat bonus).
+export function scoreWithBonuses(contextText, lessons = [], patterns = null, skills = null) {
   const ctx = String(contextText ?? "").trim();
   const list = skills ?? loadSkillsIndex();
-  const scored = scoreAll(ctx, list).map((entry) => {
+  return scoreAll(ctx, list).map((entry) => {
     const skill = list.find((s) => s.name === entry.name) ?? entry;
     let bonus = lessonBonus(skill, lessons);
     let reason = entry.reason;
@@ -155,7 +158,11 @@ export function routeWithLessons(contextText, lessons = [], patterns = null, ski
     }
     return entry;
   });
-  return topWithFallback(scored, ctx);
+}
+
+export function routeWithLessons(contextText, lessons = [], patterns = null, skills = null) {
+  const ctx = String(contextText ?? "").trim();
+  return topWithFallback(scoreWithBonuses(ctx, lessons, patterns, skills), ctx);
 }
 
 export function routerAccuracy(selected, expectedClasses = []) {
@@ -170,4 +177,4 @@ export function routerAccuracy(selected, expectedClasses = []) {
   return { hit, total, accuracy: hit / total };
 }
 
-export default { routeSkills, routeWithLessons, lessonStats, routerAccuracy, loadSkillsIndex };
+export default { routeSkills, routeWithLessons, lessonStats, routerAccuracy, loadSkillsIndex, scoreAll, topWithFallback, scoreWithBonuses };

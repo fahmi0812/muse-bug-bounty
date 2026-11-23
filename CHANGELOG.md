@@ -2,6 +2,16 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.12.0] — 2026-11-23
+
+### Added
+- **v1.12 — perbaikan kecil (dari audit "apa yang masih kurang"):**
+  - **Router accuracy 100% semua lab (mock):** dvga 100%, dvwa 88% → **100%**, juice-shop 70% → **100%**, llm-app 67% → **100%**, vampi 63% → **100%**. Caranya: (a) 8 pemetaan kelas baru di `CLASS_TO_SKILL` (weak credentials → hunt-auth-bypass, sensitive/excessive data exposure → hunt-secrets, DoS → hunt-dos baru, broken function level authorization → hunt-broken-access, local file inclusion/LFI → hunt-lfi); (b) skill baru `hunt-dos.md` (CWE-400, index 89 → **90**); (c) pengayaan keyword (hunt-auth-bypass +weak/credentials/hardcoded, hunt-secrets +sensitive/data/exposure/disclosure, hunt-llm-ai +sensitive/exfiltration/leakage/retrieval). **Jujur: ini akurasi routing mock (keyword vs label oracle), BUKAN TP/FP live — baseline live tetap menunggu laptop.**
+  - **Promosi penuh track-record (v1.11 diperbaiki):** `scoreAll`/`topWithFallback`/`scoreWithBonuses` kini diekspor dari router.js; `routeWithTrackRecord` menerapkan bonus ke SEMUA skill sebelum top-5 dipotong — skill peringkat 6 kini bisa dipromosikan (test baru membuktikannya).
+  - **Recon otomatis daftarkan surface:** `bounty recon` kini mendaftarkan hasil (hostname/URL/endpoint, max 20/run) sebagai surface ke planner via `recordSurface` — `bounty plan` langsung bisa merencanakan hunt ke temuan recon; idempotent (recon ulang tidak menambah).
+  - **Pola bersitasi 6 kelas kosong: hasil 0 (terverifikasi).** Riset ulang ke clone upstream (skill + disclosed-reports + daftar "Further...") memastikan upstream memang tidak mencantumkan ID HackerOne eksplisit untuk hunt-xss, hunt-nosqli, hunt-host-header, hunt-session, hunt-cors, hunt-websocket — tidak ada ID yang bisa ditambahkan tanpa menebak. Tetap 124 pola / 112 bersitasi.
+- **Batasan jujur v1.12.0:** 6 kelas tetap tanpa pola bersitasi (alasan di atas); 110 dari 112 pola bersitasi masih tanpa payout/tahun terverifikasi; akurasi router 100% adalah mock — bukti live (baseline, `strix --help`, runner, oracle LLMVault) tetap menunggu laptop Fahmi; winget masih belum live.
+
 ## [1.11.0] — 2026-11-23
 
 ### Added

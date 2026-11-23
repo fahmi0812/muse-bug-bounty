@@ -24,10 +24,10 @@ function runCli(args, env = {}) {
   }
 }
 
-test("v1.10 CLI: bounty skills list 89 skill + sebutkan yang baru", () => {
+test("v1.10 CLI: bounty skills list 90 skill + sebutkan yang baru", () => {
   const r = runCli(["skills"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /Total: 89 skill\./);
+  assert.match(r.stdout, /Total: 90 skill\./);
   for (const name of ["hunt-aspnet", "hunt-grpc", "hunt-laravel", "hunt-nextjs", "hunt-subdomain", "hunt-brute-force", "hunt-captcha-bypass"]) {
     assert.match(r.stdout, new RegExp(name));
   }

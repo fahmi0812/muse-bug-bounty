@@ -1,4 +1,4 @@
-// tests/integration-v18.test.js — v1.8 UI: tampilan CLI (tabel, ringkasan, warna), dibawa ke v1.11.0.
+// tests/integration-v18.test.js — v1.8 UI: tampilan CLI (tabel, ringkasan, warna), dibawa ke v1.12.0.
 // Output CLI di sini di-pipe (bukan TTY) -> warna otomatis mati, teks polos.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -17,10 +17,10 @@ function runCli(args, env = {}) {
   return r;
 }
 
-test("v1.10 CLI: --version mencetak 1.11.0", () => {
+test("v1.10 CLI: --version mencetak 1.12.0", () => {
   const r = runCli(["--version"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /bounty v1.11.0/);
+  assert.match(r.stdout, /bounty v1.12.0/);
 });
 
 test("v1.10 CLI: programs tampil sebagai tabel ber-header", () => {

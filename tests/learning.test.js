@@ -126,6 +126,26 @@ test("learning: routeWithTrackRecord — track record positif naikkan, negatif t
   assert.equal(fb[0].name, "triage-generic");
 });
 
+test("learning: routeWithTrackRecord v1.12 — skill peringkat 6 bisa dipromosikan ke top-5", () => {
+  // 6 skill, konteks "alpha beta gamma delta": A=3, B=3, C=D=E=F=2.
+  // Tanpa track: top-5 = A, B, C, D, E (F peringkat 6, urutan stabil).
+  // Dengan track +1 untuk F (+0.3 -> 2.3): F masuk top-5, E keluar.
+  const six = [
+    { name: "hunt-a", vuln_class: "Class A", keywords: ["alpha", "beta", "gamma"], when: "" },
+    { name: "hunt-b", vuln_class: "Class B", keywords: ["alpha", "beta", "delta"], when: "" },
+    { name: "hunt-c", vuln_class: "Class C", keywords: ["alpha", "beta"], when: "" },
+    { name: "hunt-d", vuln_class: "Class D", keywords: ["gamma", "delta"], when: "" },
+    { name: "hunt-e", vuln_class: "Class E", keywords: ["alpha", "gamma"], when: "" },
+    { name: "hunt-f", vuln_class: "Class F", keywords: ["beta", "gamma"], when: "" },
+  ];
+  const ctx = "alpha beta gamma delta";
+  const base = routeWithTrackRecord(ctx, [], {}, null, six);
+  assert.deepEqual(base.map((s) => s.name), ["hunt-a", "hunt-b", "hunt-c", "hunt-d", "hunt-e"]);
+  const up = routeWithTrackRecord(ctx, [], { "hunt-f": { weight: 1 } }, null, six);
+  assert.deepEqual(up.map((s) => s.name), ["hunt-a", "hunt-b", "hunt-f", "hunt-c", "hunt-d"]);
+  assert.equal(up[2].score, 2.3);
+});
+
 test("learning: findSimilarV2 menemukan near-duplicate di top-3; query kosong -> []", () => {
   const a = store.addCandidate({ program: "p1", endpoint: "/api/users", method: "GET", param: "id", vulnClass: "SQL Injection", cwe: "CWE-89" });
   store.addCandidate({ program: "p1", endpoint: "/api/users", method: "GET", param: "id", vulnClass: "SQL Injection", cwe: "CWE-89" });
