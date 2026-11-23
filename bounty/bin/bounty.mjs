@@ -1683,7 +1683,7 @@ async function cmdBench(args) {
 
 function cmdInstall(args) {
   console.log("Install Strix (resmi) — perintah di bawah ini TIDAK auto-run oleh wrapper:");
-  console.log("  curl -fsSL https://strix.ai/install.sh | sh   # verifikasi URL resmi dulu sebelum menjalankan");
+  console.log("  curl -sSL https://strix.ai/install | bash   # verifikasi URL resmi dulu sebelum menjalankan");
   console.log("  strix --version");
   console.log("");
   console.log("Catatan: wrapper memblokir pipe-to-shell otomatis (guard). Jalankan manual");
