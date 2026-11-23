@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
-// Commands: provider | run | review | report | bench | install | --help | --version
-import { readFileSync, writeFileSync, existsSync, accessSync, constants } from "node:fs";
+// Commands: provider | run | review | report | bench | install | programs | findings | --help | --version
+import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync } from "node:fs";
 import { resolve, join, delimiter } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -31,6 +31,10 @@ Penggunaan:
       guard, rate limiter, budget default $${DEFAULT_BUDGET_USD}.
       Tanpa --dry-run dan tanpa binary strix di PATH -> exit 2.
   bounty review [--queue] [--approve <id> | --reject <id>] [--export-html [FILE]]
+  bounty programs
+      List program di programs/*.md (nama, scope, budget, rate).
+  bounty findings [--program <nama>]
+      List kandidat + finding tersimpan, opsional filter program.
       List kandidat (status candidate); approve/reject per id.
       --queue: tampilkan antrean kandidat. --export-html: tulis halaman
       review statis (default eval/review.html) untuk review manual.
@@ -242,6 +246,36 @@ function cmdReview(args) {
   }
 }
 
+
+function cmdPrograms() {
+  const dir = resolve(process.cwd(), "programs");
+  let files = [];
+  try { files = readdirSync(dir).filter((f) => f.endsWith(".md")).sort(); } catch { console.error("Folder programs/ tidak ditemukan."); return 2; }
+  if (files.length === 0) { console.log("Tidak ada program di programs/."); return 0; }
+  console.log("Program:");
+  for (const f of files) {
+    try {
+      const prog = loadProgramFile(join(dir, f));
+      console.log(`  ${prog.name || f.replace(/\.md$/, "")} — scope: ${prog.allowedHosts.join(", ") || "-"} | budget: $${prog.maxBudgetUsd ?? 5} | rate: ${prog.rateLimit}/detik | roles: ${prog.roles.join(", ")}`);
+    } catch (e) { console.log(`  ${f} — (gagal dibaca: ${e.message})`); }
+  }
+  return 0;
+}
+
+function cmdFindings(args) {
+  const store = new Store();
+  try {
+    const program = args.program || null;
+    const candidates = store.listCandidates(program, "candidate");
+    const approved = store.listCandidates(program, "approved");
+    const rows = [...candidates.map((c) => ({ ...c, status: "candidate" })), ...approved.map((c) => ({ ...c, status: "approved" }))];
+    if (rows.length === 0) { console.log(program ? `Tidak ada temuan untuk program ${program}.` : "Tidak ada temuan tersimpan."); return 0; }
+    console.log("Temuan tersimpan:");
+    for (const c of rows) console.log(`  #${c.id} [${c.status}] [${c.program}] ${c.method} ${c.endpoint} param=${c.param || "-"} kelas=${c.vuln_class} cwe=${c.cwe || "-"}`);
+    return 0;
+  } finally { store.close(); }
+}
+
 function cmdReport(args) {
   const store = new Store();
   try {
@@ -347,6 +381,8 @@ export async function main(argv = process.argv.slice(2)) {
     case "provider": return await cmdProvider(args);
     case "run": return await cmdRun(args);
     case "review": return cmdReview(args);
+    case "programs": return cmdPrograms();
+    case "findings": return cmdFindings(args);
     case "report": return cmdReport(args);
     case "bench": return await cmdBench(args);
     case "install": return cmdInstall(args);

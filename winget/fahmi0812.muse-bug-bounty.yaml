@@ -1,0 +1,28 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.default.1.10.0.schema.json
+# Winget manifest — muse-bug-bounty v1.0.0
+# STATUS: siap diajukan ke microsoft/winget-pkgs (PR terpisah, review Microsoft).
+# `winget install fahmi0812.muse-bug-bounty` baru jalan SETELAH manifest ini
+# di-merge di winget-pkgs. Jangan klaim sudah bisa di-install via winget
+# sebelum itu. InstallerSha256 diisi saat release v1.0.0 dibuat di GitHub
+# (asset muse-bug-bounty-1.0.0.zip) — nilai di bawah ini placeholder.
+PackageIdentifier: fahmi0812.muse-bug-bounty
+PackageVersion: 1.0.0
+PackageLocale: en-US
+Publisher: fahmi0812
+PackageName: muse-bug-bounty
+License: Apache-2.0
+ShortDescription: Strix-powered web-first bug bounty skill + bounty CLI (scope-gated, budget-capped)
+Description: |-
+  muse-bug-bounty is a Strix extension-first bug bounty tool for Muse and standalone CLI use.
+  Scope gate, pre-execution guard, global rate limiter, single SQLite store, custom skill router,
+  Lumitome-style provider picker, and eval harness on Juice Shop / DVWA / VAmPI / DVGA / LLM-app.
+  No auto-submit, no payment, no deposit. Requires Node.js >= 24.
+Moniker: bounty
+Tags:
+  - bug-bounty
+  - security
+  - pentest
+  - strix
+  - muse
+ManifestType: default
+ManifestVersion: 1.10.0

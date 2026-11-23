@@ -29,7 +29,7 @@ key disimpan lokal dengan mode file `0600`, tidak pernah di-commit.
 
 ## Install
 
-Butuh Node.js >= 20. Pilih salah satu:
+Butuh Node.js >= 24. Pilih salah satu:
 
 ```bash
 # Linux / macOS
@@ -43,6 +43,12 @@ bash scripts/install.sh
 ```powershell
 # Windows (PowerShell)
 .\scripts\install.ps1
+```
+
+```powershell
+# Windows (winget) — setelah manifest di winget/ di-merge ke winget-pkgs
+winget install fahmi0812.muse-bug-bounty
+# Status winget: lihat winget/README.md (belum live, butuh release + PR winget-pkgs)
 ```
 
 Installer menanyakan **Docker [1] Ya / [2] Tidak** (default 1).
@@ -86,18 +92,18 @@ bounty install
 
 ```bash
 # Kering dulu — tidak ada request keluar, tidak ada temuan dikirim
-bounty run --target https://example.com --program example --dry-run
+bounty run --target https://example.com/api/users --program programs/example.md --dry-run
 
 # Jalan sungguhan (butuh Strix terinstal + scope program terdaftar)
-bounty run --target https://example.com --program example
+bounty run --target https://example.com/api/users --program programs/example.md
 
 # Lihat program & temuan yang tersimpan
 bounty programs
 bounty findings --program example
 ```
 
-Sebelum jalan, daftarkan scope program di `programs/<nama>.json`
-(contoh ada di `programs/`). Target di luar scope **ditolak** oleh
+Sebelum jalan, daftarkan scope program di `programs/<nama>.md`
+(contoh ada di `programs/` — termasuk `dvga.md` dan `llm-app.md`). Target di luar scope **ditolak** oleh
 scope gate sebelum request apa pun dikirim.
 
 ## Struktur repo
@@ -109,13 +115,14 @@ muse-bug-bounty/
 │   └── lib/                # router, dedup, rate, scope, guard,
 │                           # provider, store (SQLite bounty.db), auth, bench
 ├── skills/bounty/          # Muse skill (Mode 1)
-├── programs/               # definisi scope program (contoh)
+├── programs/               # definisi scope program (.md: example, juice-shop, dvwa, vampi, dvga, llm-app)
 ├── eval/
 │   ├── oracle/labels/      # ground truth Juice Shop / DVWA / VAmPI
 │   ├── run-bench.mjs       # bench TP/FP/FN vs baseline Strix
 │   ├── docker-compose.yml  # lab lokal (opsional, butuh Docker)
 │   └── results/            # hasil bench (latest.json)
-├── scripts/                # install.sh / install.ps1 / install.js
+├── scripts/                # install.sh / install.ps1 / install.js / bounty.cmd
+├── winget/                 # manifest winget (lihat winget/README.md — belum live)
 ├── tests/                  # node:test, tanpa network/Docker/Strix
 ├── README.md
 └── LICENSE                 # Apache-2.0
