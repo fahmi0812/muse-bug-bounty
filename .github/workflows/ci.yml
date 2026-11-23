@@ -3,13 +3,11 @@
 # nyata, tanpa Docker, tanpa Strix, tanpa API berbayar.
 name: CI
 
-
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-
 
 jobs:
   test:
@@ -20,21 +18,21 @@ jobs:
         with:
           fetch-depth: 0
 
-
       - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
           node-version: 24
-
 
       - name: Secret scan (gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-
       - name: Syntax check (node --check)
         run: |
           for f in bounty/bin/*.mjs bounty/lib/*.js scripts/install.js eval/run-bench.mjs tests/*.test.js; do
             node --check "$f"
           done
+
+      - name: Run tests
+        run: npm test
