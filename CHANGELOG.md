@@ -4,6 +4,16 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+### Fixed
+- **CLI UI/UX polish (hanya tampilan, perilaku hunt/scope/budget/store tidak berubah):**
+  - **Warning SQLite tidak lagi bocor:** `ExperimentalWarning` dari `node:sqlite` disaring di `bounty/bin/bounty.mjs` sehingga perintah baca sederhana (`--version`, `findings`, `review`, `programs`) tidak lagi mengotori stderr/CI; warning lain tetap dicetak apa adanya.
+  - **Teks `--help` dirapikan:** deskripsi yang salah tempat diperbaiki (penjelasan `run` tadinya muncul di bawah `view`; penjelasan `review` di bawah `trace`) dan perintah dikelompokkan per seksi (Setup, Alur inti, Recon & scan, dll.) agar mudah dipindai.
+  - **`bounty programs`:** label "Program" tidak lagi bertumpuk tiga (judul manual dibuang, prefiks "Program:" pada nama di-strip agar tidak menduplikasi header kolom).
+  - **Pesan gagal ke stderr:** "Scope DITOLAK" kini ditulis ke stderr (bukan stdout) di `run`/`scan`/`recon` dan diwarnai merah secara seragam lewat helper `printScope`.
+  - **Perintah tak dikenal:** kini memberi saran "Maksud Anda ...?" (jarak edit) + daftar perintah singkat ke stderr, bukan membuang seluruh teks help.
+  - **Petunjuk langkah berikutnya seragam:** `graphql`/`cloud`/`reverse`/`firmware` kini ikut menampilkan `Lihat antrean: bounty review | bounty findings` saat ada kandidat baru.
+  - **`phaseLine` dipakai** di baris budget `bounty run` (sebelumnya helper ini tak terpakai di CLI); `progressBar` menghormati parameter `width` saat `total <= 0`.
+
 ## [1.8.0] — 2026-11-23
 
 ### Added
