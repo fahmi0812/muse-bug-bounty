@@ -62,7 +62,7 @@ export async function runInstaller({ input = process.stdin, output = process.std
   console.log('  1. Instal Strix: curl -sSL https://strix.ai/install | bash');
   console.log('  2. Pilih provider saat pertama run (wizard provider);');
   console.log('     key disimpan lokal mode 0600, tidak pernah di-commit.');
-  console.log('  3. Coba kering: bounty run --target https://example.com --program example --dry-run');
+  console.log('  3. Coba kering: bounty run --target https://example.com/api/users --program programs/example.md --dry-run');
   return cfg;
 }
 
