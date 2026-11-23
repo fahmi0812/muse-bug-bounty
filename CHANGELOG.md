@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.4] — 2026-11-24
+
+### Fixed
+- **Pre-flight config Strix diperluas: nilai 'custom' yang lolos v1.13.3 kini ketangkap.** Run di laptop Fahmi tetap crash dengan ValidationError yang sama meski v1.13.3 sudah terinstal — artinya nilainya masuk lewat jalur yang belum diperiksa. Jebakan: pydantic-settings membaca env dengan `populate_by_name=True` + `case_sensitive=False`, jadi field `web_search_provider` bisa masuk lewat DUA nama env — `STRIX_WEB_SEARCH_PROVIDER` (alias) maupun `WEB_SEARCH_PROVIDER` (nama field, tanpa prefix) — dalam huruf apa pun; v1.13.3 hanya memeriksa nama alias. Kini pre-flight memindai semua kunci env (case-insensitive) untuk kedua nama itu, dan di file memeriksa bentuk flat, blok `{"env": ...}`, DAN bentuk nested `{"integrations": {...}}`. Bila sumbernya env, run dibatalkan dengan nama var yang persis (`unset WEB_SEARCH_PROVIDER`, dst.); bila sumbernya file, kunci dihapus otomatis seperti sebelumnya.
+
 ## [1.13.3] — 2026-11-24
 
 ### Fixed

@@ -62,7 +62,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.3";
+export const VERSION = "1.13.4";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -630,7 +630,7 @@ async function runSingleTarget(args, targetOverride = null) {
   if (strixConfig.fixed) console.log(`Config Strix diperbaiki: ${STRIX_CONFIG_KEY}='${strixConfig.value}' dihapus dari ~/.strix/cli-config.json (bukan nilai valid — fallback 'auto').`);
   if (!strixConfig.ok) {
     console.error(`Config Strix tidak valid: ${STRIX_CONFIG_KEY}='${strixConfig.value}' (${strixConfig.source === "env" ? "dari env shell" : "dari ~/.strix/cli-config.json"}) — nilai valid: auto, perplexity, exa.`);
-    if (strixConfig.source === "env") console.error(`Perbaiki: unset ${STRIX_CONFIG_KEY}  (atau set ke auto), lalu ulangi run.`);
+    if (strixConfig.source === "env") console.error(`Perbaiki: unset ${strixConfig.key || STRIX_CONFIG_KEY}  (atau set ke auto), lalu ulangi run.`);
     else console.error(`Perbaiki: hapus kunci ${STRIX_CONFIG_KEY} dari ~/.strix/cli-config.json, lalu ulangi run.`);
     return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
   }

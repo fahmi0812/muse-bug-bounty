@@ -57,3 +57,22 @@ test("strix-config: nilai tak valid dari env shell dilaporkan, file tidak disent
   assert.equal(r.fixed, false);
   assert.equal(JSON.parse(readFileSync(path, "utf8")).env.STRIX_LLM, "openai/x");
 });
+
+test("strix-config: nama field tanpa prefix (WEB_SEARCH_PROVIDER) juga ditangkap — env + file nested", () => {
+  // Jebakan v1.13.3: pydantic-settings populate_by_name membaca nama field
+  // tanpa prefix STRIX_ juga — nilai 'custom' lolos lewat jalur ini.
+  const envOnly = checkStrixConfig(join(tmpdir(), "tidak-ada-cli-config.json"), { WEB_SEARCH_PROVIDER: "custom" });
+  assert.equal(envOnly.ok, false);
+  assert.equal(envOnly.source, "env");
+  assert.equal(envOnly.key, "WEB_SEARCH_PROVIDER");
+  const lowerEnv = checkStrixConfig(join(tmpdir(), "tidak-ada-cli-config.json"), { web_search_provider: "custom" });
+  assert.equal(lowerEnv.ok, false);
+  assert.equal(lowerEnv.source, "env");
+  const nested = tmpConfig({ integrations: { web_search_provider: "custom" }, env: { STRIX_LLM: "openai/x" } });
+  const r = checkStrixConfig(nested, {});
+  assert.equal(r.ok, true);
+  assert.equal(r.fixed, true);
+  const after = JSON.parse(readFileSync(nested, "utf8"));
+  assert.equal("web_search_provider" in after.integrations, false);
+  assert.equal(after.env.STRIX_LLM, "openai/x");
+});
