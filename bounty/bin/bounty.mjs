@@ -18,6 +18,7 @@ import { getRoleProfile, buildInstruction } from "../lib/auth.js";
 import { detectModels, saveProvider, writeStrixConfig, loadProviders, loadProviderCreds, syncStrixConfig, buildStrixEnv, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
+import { Spinner } from "../lib/spinner.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
 import { checkFailOn, severityFor } from "../lib/failon.js";
 import { color, table, summaryBox, formatUsd, progressBar, severityBadge, phaseLine, heading, hint } from "../lib/ui.js";
@@ -62,7 +63,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.6";
+export const VERSION = "1.13.7";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -687,15 +688,41 @@ async function runSingleTarget(args, targetOverride = null) {
 
   // 5. Jalankan Strix (tanpa API berbayar dari wrapper ini — Strix memakai
   //    konfigurasi provider yang sudah disetel lewat `bounty provider`).
-  //    Output di-pipe (bukan inherit) agar bisa diparse ke store.
+  //    Output di-pipe (bukan inherit) agar bisa diparse ke store — tapi
+  //    spawnSync MEMBLOKIR event loop sehingga CLI diam total selagi
+  //    Strix jalan (pull image Docker + berpikir, bisa bermenit-menit).
+  //    Karena itu pakai spawn async + spinner status satu baris (frame
+  //    berputar + waktu berjalan + baris terakhir output Strix, TTY saja).
   console.log(`Menjalankan: ${cmd}`);
   const instruction = buildInstruction(program, role);
   const startedAt = Date.now();
-  const res = spawnSync(strix, [...strixArgs, "--instruction", instruction], {
-    encoding: "utf8",
-    // Privasi tim: telemetri Strix dimatikan (default Strix = 1).
-    env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), ...providerEnv, STRIX_TELEMETRY: "0" },
-  });
+  const spinner = new Spinner();
+  spinner.start("Strix sedang bekerja…");
+  let res;
+  try {
+    res = await new Promise((resolve) => {
+      const child = spawn(strix, [...strixArgs, "--instruction", instruction], {
+        // Privasi tim: telemetri Strix dimatikan (default Strix = 1).
+        env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), ...providerEnv, STRIX_TELEMETRY: "0" },
+      });
+      let stdout = "", stderr = "";
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      const feed = (text, isErr) => {
+        if (isErr) stderr += text; else stdout += text;
+        // Baris terakhir output (pisah \n dan \r — progress Docker
+        // memakai \r) jadi teks spinner.
+        const lines = String(text).split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
+        if (lines.length > 0) spinner.update(lines[lines.length - 1]);
+      };
+      child.stdout.on("data", (chunk) => feed(chunk, false));
+      child.stderr.on("data", (chunk) => feed(chunk, true));
+      child.on("error", (err) => resolve({ error: err, status: null, stdout, stderr }));
+      child.on("close", (status) => resolve({ error: null, status, stdout, stderr }));
+    });
+  } finally {
+    spinner.stop();
+  }
   if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return { code: done(2, "error"), usd: 0, added: 0, findings: [] }; }
   mark.strix = Date.now();
   const stdout = String(res.stdout ?? "");

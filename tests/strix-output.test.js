@@ -172,6 +172,24 @@ exit 1
   assert.doesNotMatch(r.stdout, /Ringkasan run/);
 });
 
+test("run nyata: strix lambat (sleep 1 dtk) tetap jalan — spawn async, bukan spawnSync", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-slow-strix-"));
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+sleep 1
+cat <<'EOF'
+[{"endpoint":"/api/users?id=1","method":"GET","param":"id","vuln_class":"SQL Injection","cwe":"CWE-89"}]
+EOF
+echo 'Total cost: $0.42'
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/users", "--program", "programs/example.md"], { cwd: ROOT, env, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /1 kandidat baru masuk store/);
+  // Output pipe (bukan TTY) harus bersih dari kode ANSI spinner.
+  assert.doesNotMatch(r.stdout + r.stderr, /\x1b\[2K/);
+});
+
 test("readStrixArtifacts: run.json + vulnerabilities.json jadi sumber utama", () => {
   const dir = mkdtempSync(join(tmpdir(), "bounty-artifacts-"));
   const runDir = join(dir, "strix_runs", "run-1");

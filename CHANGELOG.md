@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.7] — 2026-11-24
+
+### Added
+- **`bounty run` kini menampilkan animasi status selagi Strix bekerja** — sebelumnya CLI diam total (terlihat macet) karena Strix dijalankan lewat `spawnSync` yang memblokir event loop selagi Strix pull image Docker + berpikir (bisa bermenit-menit). Sekarang: spawn async + spinner satu baris di stderr (hanya bila TTY) berisi frame berputar, waktu berjalan, dan baris terakhir output Strix (progress pull Docker ikut tampil). Di pipe/CI spinner diam total supaya output tetap bersih. File baru `bounty/lib/spinner.js` + 3 tes unit + 1 tes run lambat.
+
 ## [1.13.6] — 2026-11-24
 
 ### Fixed
