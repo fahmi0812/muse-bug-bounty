@@ -36,3 +36,5 @@ jobs:
 
       - name: Run tests
         run: npm test
+      - name: Bench gate (mock + gate vs baseline bila ada)
+              run: npm run bench
