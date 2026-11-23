@@ -1,10 +1,15 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.10.0 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.11.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
 > (Docker/Strix/provider/PowerShell) dan ditulis jujur di sana.
+
+> **v1.11.0 — ingatan belajar (2026-11-23):** `bounty/lib/learning.js` —
+> track record presisi per skill dari verdict reviewer (router naik/turun
+> max ±0.3) + similarity vektor-hash di `findings --similar` +
+> `bounty memory --track-record`. Menutup rangkaian v1.9 → v1.10 → v1.11.
 
 > **v1.10.0 — planner coverage (2026-11-23):** `bounty/lib/planner.js` +
 > perintah baru `bounty plan` — peta surface × kelas vuln, rencana hunt

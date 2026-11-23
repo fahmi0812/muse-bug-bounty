@@ -187,20 +187,22 @@ export async function runBench({ runs = RUNS } = {}) {
   // yang di-route mengandung hunt-<kelas> yang sesuai dengan oracle.
   // Hit rate, bukan latensi — latensi tidak membuktikan pilihan benar.
   // v1.2 (M2): router memakai lesson dari store + pola bersitasi bila ada.
+  // v1.11: ditambah track record per skill (presisi dari verdict reviewer).
   let routerAccuracy = null;
   if (lib.bench?.routerAccuracy) {
     routerAccuracy = {};
     let routeFn = null;
     try {
       const { Store } = await import('../bounty/lib/store.js');
-      const { routeWithLessons } = await import('../bounty/lib/router.js');
+      const { routeWithTrackRecord, skillTrackRecord } = await import('../bounty/lib/learning.js');
       const { listLessons } = await import('../bounty/lib/memory.js');
       const { loadPatterns } = await import('../bounty/lib/patterns.js');
       const store = new Store();
       try {
         const lessons = listLessons(store.db);
         const patterns = loadPatterns();
-        routeFn = (ctx) => routeWithLessons(ctx, lessons, patterns);
+        const trackRecord = skillTrackRecord(store.db);
+        routeFn = (ctx) => routeWithTrackRecord(ctx, lessons, trackRecord, patterns);
       } finally { store.close(); }
     } catch { routeFn = null; }
     for (const l of labs) {

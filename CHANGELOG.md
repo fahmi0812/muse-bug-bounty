@@ -2,6 +2,14 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.11.0] — 2026-11-23
+
+### Added
+- **v1.11 — ingatan yang benar-benar belajar (PentAGI-style, ringan), tahap 3 dari "gas semuanya berurutan":**
+  - **`bounty/lib/learning.js` (baru, zero-dep):** `hashVector` (feature-hashing 128-dim, FNV-1a, L2-normalize) + `vectorCosine`; `skillTrackRecord` (presisi per skill dari verdict reviewer: confirmed/(confirmed+fp); weight = (presisi − 0.5) × 2, clamp ±1, **weight 0 bila total < 3** — data minim tidak berpendapat); `routeWithTrackRecord` (skor keyword + nudge lesson ±0.15 cap ±0.45 + bonus pola + **bonus track-record ±0.3**; tanpa lesson/track/pola → deepEqual-identik dengan router lama); `findSimilarV2` (fusion 0.4·BM25 + 0.2·TF-IDF + 0.2·cosine vektor-hash + 0.2·boost kelas+CWE). 5 test.
+  - **Penyambungan:** `bounty findings --similar` dan peringatan FP di `bounty run` kini pakai `findSimilarV2`; `bounty memory --track-record` tampilkan tabel presisi + bobot per skill (butuh ≥3 verdict); bench kini route lewat `routeWithTrackRecord` (tanpa lesson/track → hasil sama).
+  - **Batasan jujur v1.11.0:** track-record hanya mengurutkan ulang skill yang sudah masuk top-5 keyword (skill peringkat 6 tidak bisa dipromosikan — `scoreAll` di router.js tidak diekspor; promosi penuh butuh satu baris ekspor di sana); similarity vektor = hash token, bukan embedding model (tidak menangkap sinonim); baseline live + oracle LLMVault tetap menunggu laptop Fahmi. Ini menutup rangkaian "gas semuanya berurutan" (v1.9 otak → v1.10 planner → v1.11 ingatan).
+
 ## [1.10.0] — 2026-11-23
 
 ### Added

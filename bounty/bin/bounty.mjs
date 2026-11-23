@@ -29,6 +29,7 @@ import { listNodes, listEdges, traceFinding } from "../lib/graph.js";
 import { routeWithLessons } from "../lib/router.js";
 import { loadPatterns, citedPatterns, patternEvidence } from "../lib/patterns.js";
 import { buildCoverageMap, planNext, recordSurface, coverageSummary } from "../lib/planner.js";
+import { findSimilarV2, skillTrackRecord, routeWithTrackRecord } from "../lib/learning.js";
 import { runSubfinder, runDnsx, runHttpx, runKatana, runNucleiKev, updateNucleiTemplates, crtsh, RECON_TOOLS } from "../lib/recon.js";
 import { runJsluice, runSourcemapper } from "../lib/jsmining.js";
 import { startInteractsh, pollInteractsh, stopInteractsh } from "../lib/oast.js";
@@ -57,7 +58,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.10.0";
+export const VERSION = "1.11.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -93,7 +94,7 @@ ALUR INTI
       review statis (default eval/review.html) untuk review manual.
   bounty findings [--program <nama>] [--similar <id>]
       List kandidat + finding tersimpan, opsional filter program.
-      --similar <id>: temuan serupa dari memori (FTS5 + RRF).
+      --similar <id>: temuan serupa dari memori (FTS5 + RRF + vektor hash).
   bounty report [--out FILE]
       Render laporan temuan ke stdout (atau file).
   bounty trace <finding-id>
@@ -156,7 +157,7 @@ PLATFORM (read-only, tanpa auto-submit)
 MEMORI, GRAF & POLA
   bounty programs
       List program di programs/*.md (nama, scope, budget, rate).
-  bounty memory [--list] [--lessons] [--program <nama>]
+  bounty memory [--list] [--lessons] [--track-record] [--program <nama>]
       Episode memori per run/review + lesson dari verdict manusia.
   bounty graph [--program <nama>]
       Graf aset (view SQL): node/edge, aset terpanas, cakupan open.
@@ -454,7 +455,7 @@ async function runSingleTarget(args, targetOverride = null) {
         for (const f of fresh) recordCoverage(store.db, program.name, f.endpoint, f.vulnClass, "examined");
         const rejectedIds = new Set(store.listCandidates(program.name, "rejected").map((c) => c.id));
         for (const f of fresh) {
-          const similar = findSimilar(store.db, { endpoint: f.endpoint, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe }, 3)
+          const similar = findSimilarV2(store.db, { endpoint: f.endpoint, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe }, 3)
             .filter((s) => rejectedIds.has(s.id));
           if (similar.length > 0) console.log(`Peringatan: pola serupa pernah DITOLAK (FP) — kandidat #${similar[0].id} ${similar[0].endpoint} (${similar[0].vulnClass}). Verifikasi ekstra sebelum approve.`);
         }
@@ -621,12 +622,12 @@ function cmdPrograms() {
 function cmdFindings(args) {
   const store = new Store();
   try {
-    // --similar <id>: temuan serupa dari memori (FTS5 + RRF, v1.2 M1).
+    // --similar <id>: temuan serupa dari memori (FTS5 + RRF + vektor hash, v1.11).
     if (args.similar) {
       const row = store.db.prepare("SELECT * FROM candidate WHERE id = ?").get(Number(args.similar));
       if (!row) { console.log(`Kandidat #${args.similar} tidak ditemukan.`); return 2; }
       console.log(`Serupa dengan #${row.id} ${row.method} ${row.endpoint} (${row.vuln_class}):`);
-      const similar = findSimilar(store.db, { endpoint: row.endpoint, param: row.param, vulnClass: row.vuln_class, cwe: row.cwe }, 5)
+      const similar = findSimilarV2(store.db, { endpoint: row.endpoint, param: row.param, vulnClass: row.vuln_class, cwe: row.cwe }, 5)
         .filter((s) => s.id !== row.id);
       if (similar.length === 0) { console.log("  (tidak ada yang serupa di store)"); return 0; }
       for (const s of similar) console.log(`  #${s.id} skor=${s.score.toFixed(2)} ${s.endpoint} (${s.vulnClass})`);
@@ -648,6 +649,17 @@ function cmdFindings(args) {
 function cmdMemory(args) {
   const store = new Store();
   try {
+    if (args["track-record"]) {
+      const record = skillTrackRecord(store.db);
+      const rows = Object.values(record).filter((r) => r.total >= 3);
+      if (rows.length === 0) { console.log("Belum ada track record (butuh ≥3 verdict per skill)."); return 0; }
+      const tableRows = rows
+        .sort((a, b) => b.precision - a.precision)
+        .map((r) => [r.skill, String(r.confirmed), String(r.falsePositive), `${Math.round(r.precision * 100)}%`, r.weight > 0 ? `+${r.weight.toFixed(2)}` : r.weight.toFixed(2)]);
+      console.log(table(tableRows, ["Skill", "Terkonfirmasi", "False positive", "Presisi", "Bobot"]));
+      console.log("Bobot dipakai router: skill presisi tinggi naik, presisi rendah turun (max ±0.3).");
+      return 0;
+    }
     if (args.lessons) {
       const lessons = listLessons(store.db);
       if (lessons.length === 0) { console.log("Belum ada lesson dari verdict reviewer."); return 0; }
