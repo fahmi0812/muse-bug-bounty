@@ -4,6 +4,12 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.3.2] — 2026-11-23
+
+### Added
+- **2 skill terakhir yang tertunda sejak v1.1, kini selesai dengan parafrase defensif** (ditulis langsung satu-satu, sama seperti v1.3.1 — keduanya lolos tanpa flag): `hunt-mfa-bypass` (fokus celah logika penegakan MFA; menebak/brute-force kode MFA dan OTP DILARANG eksplisit di skill) dan `hunt-host-header` (fokus tautan reset + cache, hanya akun test sendiri). Index 57 → **59 entri**. Semua skill Tier 1 + Tier 2 dari plan-power-v1.1 kini lengkap — tidak ada lagi skill tertunda.
+- **Batasan jujur v1.3.2:** angka bench tidak berubah (oracle lab tidak punya kelas MFA bypass / host header) — efek dua skill ini baru terasa di target asli.
+
 ## [1.3.1] — 2026-11-23
 
 ### Added

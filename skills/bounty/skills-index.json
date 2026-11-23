@@ -818,5 +818,34 @@
    "report"
   ],
   "when": "Mengatur urutan hunt, kapan berhenti, dan kapan lapor."
+ },
+ {
+  "name": "hunt-mfa-bypass",
+  "file": "hunt/hunt-mfa-bypass.md",
+  "vuln_class": "MFA Bypass",
+  "cwe": "CWE-287",
+  "keywords": [
+   "mfa",
+   "two-factor",
+   "2fa",
+   "otp",
+   "verification",
+   "bypass"
+  ],
+  "when": "Langkah MFA bisa dilewati atau tidak ditegakkan di semua jalur dan aksi sensitif."
+ },
+ {
+  "name": "hunt-host-header",
+  "file": "hunt/hunt-host-header.md",
+  "vuln_class": "Host Header Injection",
+  "cwe": "CWE-74",
+  "keywords": [
+   "host header",
+   "host",
+   "password reset",
+   "cache poisoning",
+   "x-forwarded-host"
+  ],
+  "when": "Header Host dipakai mentah untuk tautan, redirect, atau kunci cache."
  }
 ]
