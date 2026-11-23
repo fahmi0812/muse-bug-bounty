@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [Unreleased]
+
+### Fixed
+- **`bounty/bin/bounty.mjs` kini executable (mode 755 di git).** Instal global kadang berakhir "Permission denied" karena file bin tersimpan 644 dan npm tidak selalu menambahkan +x. Kini mode executable ikut terlacak di repo, jadi instal global berikutnya langsung bisa jalan tanpa `chmod` manual.
+
 ## [1.13.0] — 2026-11-24
 
 ### Added
