@@ -2,6 +2,13 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [Unreleased]
+
+### Added
+- **Alur run -> store -> review disambung (kritik #1):** `bounty run` meneruskan `--skills-dir` (+ `STRIX_SKILLS_DIR`) dan `--max-turns` (default 500) ke Strix; output Strix diparse (`bounty/lib/strix-output.js`: JSON/JSONL/Markdown, kanonikalisasi kelas + CWE, dedup) menjadi kandidat `candidate` di `bounty.db`; biaya terukur (`$X`) dicatat di tabel `run`. Diuji dengan Strix palsu (98/98 test).
+- **Eval live + baseline (kritik #2):** `eval/measure-baseline.mjs` (`npm run measure-baseline`, `npm run bench:live`) — nyalakan lab Docker, ukur baseline Strix vs bounty, simpan `eval/results/baseline.json` + `latest.json`, gate TP/FP per lab. Exit 2 bila Docker/Strix tidak ada (bukan mock diam-diam). `npm run bench` kini menjalankan gate vs baseline bila `baseline.json` ada.
+- **CI bench gate:** `npm run bench` ditambah ke `.github/workflows/ci.yml` (perlu di-push lewat browser Fahmi — workflow tidak bisa lewat API).
+
 ## [1.0.0] — 2026-11-23
 
 Rilis produksi pertama (v1.0.0). Status: **produksi (docs + kode v1)** —

@@ -223,9 +223,38 @@ export async function runBench({ runs = RUNS } = {}) {
   return result;
 }
 
+// Gate vs baseline (bila eval/results/baseline.json ada — diukur live lewat
+// `npm run measure-baseline` di laptop). Mock bench TIDAK boleh mengklaim
+// menang vs baseline: bila baseline ada, bandingkan median; bila TP turun
+// atau FP naik, exit 1. Bila baseline belum ada, gate dilewati dengan catatan.
+export function gateVsBaseline(result) {
+  const basePath = join(RESULTS_DIR, 'baseline.json');
+  if (!existsSync(basePath)) {
+    console.log('\nGate baseline: dilewati — eval/results/baseline.json belum ada. Ukur live: npm run measure-baseline');
+    return true;
+  }
+  const base = JSON.parse(readFileSync(basePath, 'utf8'));
+  let ok = true;
+  for (const l of result.labs) {
+    const b = base.labs?.[`${l.lab}:baseline`]?.median ?? base.labs?.[l.lab]?.median;
+    if (!b) { console.log(`Gate ${l.lab}: baseline tidak ada — dilewati`); continue; }
+    const pass = l.median.tp >= b.tp && l.median.fp <= b.fp;
+    console.log(`Gate ${l.lab}: baseline TP=${b.tp} FP=${b.fp} -> bench TP=${l.median.tp} FP=${l.median.fp} : ${pass ? 'LOLOS' : 'GAGAL'}`);
+    if (!pass) ok = false;
+  }
+  return ok;
+}
+
 const isMain = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 if (isMain) {
   const runsArg = process.argv.find((a) => a.startsWith('--runs='));
   const runs = runsArg ? Number(runsArg.split('=')[1]) || RUNS : RUNS;
-  await runBench({ runs });
+  if (process.argv.includes('--live')) {
+    console.log('Mode --live: delegasi ke eval/measure-baseline.mjs (butuh Docker + Strix).');
+    const { main } = await import('./measure-baseline.mjs');
+    process.exit(main(process.argv.slice(2).filter((a) => a !== '--live')));
+  }
+  const result = await runBench({ runs });
+  const ok = gateVsBaseline(result);
+  if (!ok) process.exit(1);
 }

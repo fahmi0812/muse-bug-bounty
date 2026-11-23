@@ -11,7 +11,9 @@
   "name": "muse-bug-bounty",
   "scripts": {
     "bench": "node eval/run-bench.mjs",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "measure-baseline": "node eval/measure-baseline.mjs",
+    "bench:live": "node eval/measure-baseline.mjs --mode both"
   },
   "type": "module",
   "version": "1.0.0"

@@ -2,7 +2,7 @@
 // bounty — zero-dependency CLI wrapper (Node >= 20).
 // Commands: provider | run | review | report | bench | install | programs | findings | --help | --version
 import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync } from "node:fs";
-import { resolve, join, delimiter } from "node:path";
+import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
 import { createInterface } from "node:readline";
 import { Store } from "../lib/store.js";
@@ -15,9 +15,16 @@ import { TokenBucket } from "../lib/rate.js";
 import { getRoleProfile, buildInstruction } from "../lib/auth.js";
 import { detectModels, saveProvider, writeStrixConfig, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
+import { parseStrixOutput } from "../lib/strix-output.js";
+import { dedupCandidates } from "../lib/dedup.js";
+import { fileURLToPath } from "node:url";
 
 export const VERSION = "0.1.0";
 const DEFAULT_BUDGET_USD = 5;
+const DEFAULT_MAX_TURNS = 500;
+// Root repo (untuk --skills-dir): bounty/bin/ -> ../../
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
+const SKILLS_DIR = process.env.STRIX_SKILLS_DIR || resolve(REPO_ROOT, "skills", "bounty");
 
 const HELP = `bounty — muse-bug-bounty wrapper v${VERSION} (zero-dependency, $0)
 
@@ -163,6 +170,7 @@ async function cmdRun(args) {
     console.log("Strix tidak ditemukan — jalankan mode --dry-run atau install Strix via curl resmi");
     console.log("  Jalankan: bounty install --strix   (menampilkan perintah resmi, tanpa auto-run)");
     if (args["dry-run"]) {
+      console.log(`[dry-run] skills-dir: ${SKILLS_DIR} (akan diteruskan ke Strix via --skills-dir / STRIX_SKILLS_DIR)`);
       console.log("[dry-run] Instruksi yang akan dikirim ke Strix:");
       console.log(buildInstruction(program, role));
       return done(0, "dry-run");
@@ -171,9 +179,17 @@ async function cmdRun(args) {
   }
 
   // 4. Pre-exec guard + rate limiter
+  // Rate limiter: TokenBucket menegakkan rate request WRAPPER (pre/post
+  // run). Request internal Strix TIDAK lewat bucket ini — Strix dibatasi
+  // lewat --max-budget-usd / --max-turns + instruksi rate di bawah, dan
+  // itu ditulis jujur di README (bukan klaim penegakan penuh).
   const rate = Number(program.rateLimit) || 10;
   const bucket = new TokenBucket(rate, rate);
-  const cmd = `strix --target ${target} --budget ${budget}`;
+  const maxTurns = Number(args["max-turns"] ?? DEFAULT_MAX_TURNS);
+  const skillsDir = existsSync(SKILLS_DIR) ? SKILLS_DIR : null;
+  const strixArgs = ["--target", target, "--budget", String(budget), "--max-budget-usd", String(budget), "--max-turns", String(maxTurns)];
+  if (skillsDir) strixArgs.push("--skills-dir", skillsDir);
+  const cmd = `strix ${strixArgs.join(" ")}`;
   const guard = checkCommand(cmd, process.cwd());
   if (!guard.allowed) {
     console.error(`Perintah diblokir guard: ${guard.reason}`);
@@ -183,20 +199,49 @@ async function cmdRun(args) {
 
   if (args["dry-run"]) {
     console.log(`[dry-run] strix ditemukan di ${strix}; perintah yang akan jalan: ${cmd}`);
+    console.log(`[dry-run] skills-dir: ${skillsDir ?? "(tidak ditemukan — skill tidak diteruskan)"}`);
     console.log(buildInstruction(program, role));
     return done(0, "dry-run");
   }
 
   // 5. Jalankan Strix (tanpa API berbayar dari wrapper ini — Strix memakai
   //    konfigurasi provider yang sudah disetel lewat `bounty provider`).
+  //    Output di-pipe (bukan inherit) agar bisa diparse ke store.
   console.log(`Menjalankan: ${cmd}`);
   const instruction = buildInstruction(program, role);
-  const res = spawnSync(strix, ["--target", target, "--budget", String(budget), "--instruction", instruction], {
-    stdio: "inherit",
-    env: { ...process.env },
+  const startedAt = Date.now();
+  const res = spawnSync(strix, [...strixArgs, "--instruction", instruction], {
+    encoding: "utf8",
+    env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}) },
   });
   if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return done(2, "error"); }
+  const stdout = String(res.stdout ?? "");
+  const stderr = String(res.stderr ?? "");
+  if (stdout) process.stdout.write(stdout);
+  if (stderr) process.stderr.write(stderr);
+
+  // 6. Parse output Strix -> store (run -> store -> review).
+  //    Semua temuan masuk sebagai "candidate" (UNVERIFIED) — reviewer
+  //    yang memutuskan di `bounty review`. Dedup dulu vs store + internal.
   const code = res.status ?? 0;
+  try {
+    const store = new Store();
+    try {
+      const { findings, usd } = parseStrixOutput(stdout + "\n" + stderr, program.name);
+      const existing = store.listCandidates(program.name, "candidate")
+        .map((c) => ({ endpoint: c.endpoint, method: c.method, param: c.param, vuln_class: c.vuln_class, cwe: c.cwe }));
+      const { unique } = dedupCandidates([...existing, ...findings]);
+      const fresh = unique.slice(existing.length);
+      let added = 0;
+      for (const f of fresh) {
+        store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
+        added++;
+      }
+      store.addRun({ version: "bounty", target, lab: program.name, tp: 0, fp: 0, fn: 0, timeMs: Date.now() - startedAt, usd });
+      console.log(`\nHasil parse: ${findings.length} temuan dari output Strix, ${added} kandidat baru masuk store (dedup: ${findings.length - added} duplikat). Biaya terukur: $${usd}.`);
+      console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
+    } finally { store.close(); }
+  } catch (e) { console.error(`Peringatan: gagal menyimpan hasil ke store: ${e.message}`); }
   return done(code, code === 0 ? "ok" : "failed");
 }
 

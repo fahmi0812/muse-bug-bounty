@@ -131,9 +131,12 @@ muse-bug-bounty/
 ## Test & bench
 
 ```bash
-npm test          # node --test tests/ — deterministik, tanpa network
-npm run bench     # eval/run-bench.mjs — mode no-docker bila Docker tak ada
+npm test                  # node --test tests/ — deterministik, tanpa network
+npm run bench             # eval/run-bench.mjs — mock (deterministik) + gate baseline bila baseline.json ada
+npm run measure-baseline  # LIVE: ukur baseline Strix vs bounty di lab Docker (butuh Docker + Strix, di laptop)
 ```
+
+`bounty run` sekarang meneruskan skill ke Strix (`--skills-dir` + `STRIX_SKILLS_DIR`), lalu mem-parse output Strix (JSON / JSONL / Markdown) menjadi kandidat di `bounty.db` — semua berstatus `candidate` (UNVERIFIED) sampai disetujui di `bounty review`. Biaya terukur dari output (`Total cost: $X`) dicatat di tabel `run`.
 
 Bench menjalankan tiap lab 3× (mock findings deterministik, seed tetap),
 menghitung TP/FP/FN/precision/recall per run dan median lintas run,
@@ -149,7 +152,7 @@ tidak turun dibanding baseline Strix. Detail di
   `git push`, `git reset --hard`, baca `.env`, pipe-to-shell, ...).
   Hanya perintah yang diizinkan (mis. `strix --target ...`) yang jalan.
 - **Budget** — default **$5/target**; run berhenti saat budget habis.
-- **Rate limit** — default **10 req/detik** global, dengan backoff.
+- **Rate limit** — default **10 req/detik** global, dengan backoff. Jujur: bucket menegakkan rate request wrapper; request internal Strix dibatasi lewat `--max-budget-usd` / `--max-turns` + instruksi, bukan lewat bucket wrapper.
 - **Kredensial** — `providers.json` / `credentials.json` disimpan
   mode `0600`, masuk `.gitignore`, tidak pernah dikirim ke mana pun
   selain provider yang user pilih.
@@ -165,6 +168,7 @@ tidak turun dibanding baseline Strix. Detail di
   berbayar / `GET /models` ke provider nyata dari repo ini.
 - **PowerShell installer (`scripts/install.ps1`) belum diuji live**
   di Windows.
+- **Baseline belum pernah diukur live**: `eval/results/baseline.json` belum ada — ukur di laptop: `npm run measure-baseline` (butuh Docker + Strix). Sampai itu jalan, klaim TP/FP vs baseline belum terbukti.
 - **P2 belum diuji live**: fork Strix, PentAGI, MCP platform, RE,
   mobile, LLM red-team, capture 2FA — semuanya docs + template di
   `docs/p2-*.md`, belum ada run nyata.
