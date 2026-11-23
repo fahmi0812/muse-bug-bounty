@@ -1,6 +1,6 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.2.0 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.3.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
@@ -142,6 +142,8 @@ npm run measure-baseline  # LIVE: ukur baseline Strix vs bounty di lab Docker (b
 
 **v1.2 — ingatan + peta:** tiap run/review menulis episode memori; verdict reviewer (approve/reject) jadi lesson yang mengubah skor router di run berikutnya; `bounty findings --similar <id>` mencari temuan serupa (FTS5 + RRF) dan run memberi peringatan bila polanya pernah ditolak; `bounty memory` / `bounty graph` / `bounty trace <id>` menampilkan ingatan, peta aset, dan jejak source → sink. Semua di `bounty.db` yang sama, tanpa server baru.
 
+**v1.3 — perdalam + scale:** 7 runner baru (arjun, graphql-cop, gitleaks, trufflehog, osv-scanner, garak, deepteam) — `bounty scan` kini 10 tool; `bounty run --targets url1,url2` antrean multi-target dengan satu pool budget + peringatan biaya; `bounty view` membuka dashboard Strix; lab LLM nyata dipilih: LLMVault (MIT, 25 lab OWASP LLM Top 10 — endpoint/oracle belum diverifikasi live). 2 skill Tier 2 baru (lfi, nosqli; index 49) + 2 skill Trail of Bits; 8 skill Tier 2 tertunda karena flag keamanan — lihat CHANGELOG.
+
 Bench menjalankan tiap lab 3× (mock findings deterministik, seed tetap),
 menghitung TP/FP/FN/precision/recall per run dan median lintas run,
 lalu menyimpan `eval/results/latest.json`. Gate: FP harus turun dan TP
@@ -176,6 +178,12 @@ tidak turun dibanding baseline Strix. Detail di
 - **P2 belum diuji live**: fork Strix, PentAGI, MCP platform, RE,
   mobile, LLM red-team, capture 2FA — semuanya docs + template di
   `docs/p2-*.md`, belum ada run nyata.
+- **v1.3 (baru):** 8 skill Tier 2 tertunda karena flag keamanan
+  (`hunt-dom` dihentikan saat penulisan; 7 lainnya belum dibuat);
+  flag CLI runner batch 2 (arjun, graphql-cop, gitleaks, trufflehog,
+  osv-scanner, garak, deepteam) best-effort — belum diuji live terhadap
+  binary aslinya; lab LLMVault (build git-context) belum dijalankan
+  live dan endpoint/oracle llm-app belum diverifikasi terhadapnya.
 - Bench live ke lab Docker (Juice Shop/DVWA/VAmPI sungguhan) belum
   dijalankan; angka TP/FP sejauh ini dari mock deterministik.
 

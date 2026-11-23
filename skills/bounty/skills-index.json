@@ -644,5 +644,64 @@
    "cross-site websocket"
   ],
   "when": "Koneksi WebSocket tanpa cek origin/auth, atau tanpa enkripsi."
+ },
+ {
+  "name": "audit-context-building",
+  "file": "hunt/audit-context-building.md",
+  "vuln_class": "Audit Context Building",
+  "cwe": "CWE-1050",
+  "keywords": [
+   "audit",
+   "konteks",
+   "trust boundary",
+   "asumsi",
+   "permukaan",
+   "prioritas"
+  ],
+  "when": "Memulai audit: petakan permukaan, trust boundary, dan asumsi sebelum hunting."
+ },
+ {
+  "name": "insecure-defaults",
+  "file": "hunt/insecure-defaults.md",
+  "vuln_class": "Insecure Defaults",
+  "cwe": "CWE-1188",
+  "keywords": [
+   "default",
+   "kredensial default",
+   "debug",
+   "konfigurasi",
+   "misconfiguration",
+   "admin"
+  ],
+  "when": "Kredensial atau konfigurasi bawaan produk masih aktif dan bisa dieksploitasi."
+ },
+ {
+  "name": "hunt-lfi",
+  "file": "hunt/hunt-lfi.md",
+  "vuln_class": "Local File Inclusion",
+  "cwe": "CWE-98",
+  "keywords": [
+   "lfi",
+   "local file inclusion",
+   "path traversal",
+   "include",
+   "../"
+  ],
+  "when": "Parameter path/file bisa diarahkan ke file lokal di server."
+ },
+ {
+  "name": "hunt-nosqli",
+  "file": "hunt/hunt-nosqli.md",
+  "vuln_class": "NoSQL Injection",
+  "cwe": "CWE-943",
+  "keywords": [
+   "nosql",
+   "mongodb",
+   "injection",
+   "$ne",
+   "$where",
+   "operator"
+  ],
+  "when": "Input sampai ke query NoSQL tanpa sanitasi (operator injection)."
  }
 ]

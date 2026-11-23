@@ -27,17 +27,20 @@ services:
       - "5013:5013"
     networks: [bounty-lab]
 
-  # P1-3 — app ber-LLM. PLACEHOLDER: belum ada satu image lab LLM resmi
-  # yang dipatok (kandidat: lab OWASP LLM Top 10 / playground prompt
-  # injection). Service ini tidak ikut `up` default (profile: llm) dan
-  # memakai image Python resmi sebagai stand-in sampai lab final dipilih
-  # dan oracle llm-app.json diverifikasi terhadapnya. Jangan pakai image
-  # ini sebagai klaim lab LLM sudah tervalidasi.
+  # Lab LLM nyata (v1.3): LLMVault (CyberSunil/LLMVault, MIT, 25 lab
+  # OWASP LLM Top 10 2025, Play Mode scripted/offline tanpa API key).
+  # Build dari repo resmi via git context (tidak ada image prebuilt
+  # resmi yang terverifikasi). Port dipetakan 8000:5000 supaya program
+  # llm-app (localhost:8000) tetap jalan. Service ini tidak ikut `up`
+  # default (profile: llm). JUJUR: endpoint + oracle llm-app.json
+  # (/chat, /tools/execute) ditulis untuk placeholder lama dan BELUM
+  # diverifikasi terhadap rute LLMVault — verifikasi live di laptop
+  # sebelum angka bench llm-app diklaim. Jangan expose ke internet
+  # (sengaja rentan, untuk lab lokal saja).
   llm-app:
-    image: python:3.12-slim
-    command: ["python", "-m", "http.server", "8000"]
+    build: https://github.com/CyberSunil/LLMVault.git#main
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:5000"
     profiles: ["llm"]
     networks: [bounty-lab]
 

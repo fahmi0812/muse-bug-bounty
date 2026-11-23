@@ -4,6 +4,18 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-11-23
+
+### Added
+- **v1.3 — Perdalam + scale (plan-power-v1.1):**
+  - **Skill Tier 2 (sebagian):** `hunt-lfi`, `hunt-nosqli` (index 47 → 49). **Ditunda jujur:** `hunt-dom` kena flag keamanan saat penulisan dan TIDAK dibuat ulang; 7 skill Tier 2 lainnya (`hunt-nodejs`, `hunt-http-smuggling`, `hunt-jwt-crypto`, `hunt-llm-ai`, `hunt-api-misconfig`, `web2-recon`, `bug-bounty`) belum dibuat karena tool agen penulis dimatikan setelah flag itu — akan ditulis terpisah setelah tinjauan manual. (Pola sama seperti `hunt-mfa-bypass`/`hunt-host-header` di v1.1.)
+  - **Runner batch 2 (7 runner, `SUPPORTED_TOOLS` 3 → 10):** arjun (parameter tersembunyi), graphql-cop, gitleaks, trufflehog, osv-scanner (reachability hanya `reachable` bila ada bukti pemakaian paket, tanpa bukti = `unproven`), garak, deepteam — semua mengikuti pola lama (scope gate, binary hilang = dilewati, timeout 120 detik, hasil = kandidat). `bounty scan --path DIR` (checkout lokal osv-scanner) + `--model MODEL` (garak/deepteam). Playbook baru `playbooks/runners-v13.md`. Flag CLI runner mengikuti dokumentasi tiap tool (best-effort, parser toleran).
+  - **Trail of Bits (3.3):** `audit-context-building` + `insecure-defaults` (ditulis ulang, atribusi CC-BY-SA-4.0) — `insecure-defaults` memakai pola refuting verifier (default yang terlihat tidak aman wajib dibuktikan dengan akun test sebelum dilapor).
+  - **Cost tracking nyata (3.5):** `bounty/lib/cost.js` (`costFromRunJson`, `budgetStatus` warn ≥80%, `shouldStop`); `bounty run` kini mencetak peringatan saat biaya mendekati/melebihi budget.
+  - **Multi-target + SARIF (3.6):** `bounty/lib/queue.js` — `bounty run --targets url1,url2` menjalankan target satu per satu dengan satu pool budget (berhenti bila tercapai); `bounty/lib/sarif.js` membaca `strix_runs/<run>/findings.sarif` Strix sebagai sumber temuan ketiga (tanpa generator SARIF sendiri); `bounty view` membuka dashboard Strix di background (bukan dashboard sendiri).
+  - **Lab LLM nyata (3.7):** service `llm-app` di `eval/docker-compose.yml` kini build dari repo resmi LLMVault (CyberSunil/LLMVault, MIT, 25 lab OWASP LLM Top 10 2025, Play Mode offline), port 8000:5000. **Jujur: endpoint + oracle llm-app.json BELUM diverifikasi terhadap rute LLMVault** — verifikasi live di laptop sebelum angka bench llm-app diklaim.
+- **Batasan jujur v1.3:** 8 skill Tier 2 tertunda (lihat di atas); flag CLI runner best-effort (belum diuji live terhadap binary aslinya); lab LLMVault belum dijalankan live di VM (tidak ada Docker) — compose git-context belum terbukti jalan.
+
 ## [1.2.0] — 2026-11-23
 
 ### Added

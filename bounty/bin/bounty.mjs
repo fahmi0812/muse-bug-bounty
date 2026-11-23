@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
 // Commands: provider | run | review | report | bench | install | programs | findings | scan | memory | graph | trace | --help | --version
-import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import { Store } from "../lib/store.js";
 import { parseProgram, loadProgramFile, checkScope } from "../lib/scope.js";
@@ -18,6 +18,9 @@ import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates } from "../lib/dedup.js";
 import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
+import { budgetStatus } from "../lib/cost.js";
+import { runQueue } from "../lib/queue.js";
+import { readSarif } from "../lib/sarif.js";
 import { recordEpisode, listEpisodes, listLessons, addLesson, findSimilar, recordCoverage } from "../lib/memory.js";
 import { listNodes, listEdges, traceFinding } from "../lib/graph.js";
 import { routeWithLessons } from "../lib/router.js";
@@ -25,7 +28,7 @@ import { loadPatterns } from "../lib/patterns.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
-export const VERSION = "1.2.0";
+export const VERSION = "1.3.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -39,7 +42,10 @@ Penggunaan:
       Pilih provider/model LLM (interaktif via stdin). Deteksi model dari
       {baseUrl}/models. Simpan ke .bounty/providers/ (0600).
   bounty run [--program programs/example.md] [--target URL] [--role low|high]
-             [--budget 5] [--dry-run]
+             [--budget 5] [--dry-run] [--targets URL1,URL2]
+      --targets: antrean multi-target (satu per satu, satu pool budget).
+  bounty view
+      Buka dashboard Strix (strix view) di background.
       Jalankan Strix dalam scope program. Scope-gate dulu, lalu pre-exec
       guard, rate limiter, budget default $${DEFAULT_BUDGET_USD}.
       Tanpa --dry-run dan tanpa binary strix di PATH -> exit 2.
@@ -62,7 +68,8 @@ Penggunaan:
       Render laporan temuan ke stdout (atau file).
   bounty bench [--lab NAME] [--runs N]
       Jalankan benchmark (eval/run-bench.mjs bila ada, fallback mock).
-  bounty scan --tool nuclei|dalfox|ffuf --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N]
+  bounty scan --tool nuclei|dalfox|ffuf|arjun|graphql-cop|gitleaks|trufflehog|osv-scanner|garak|deepteam --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N] [--path DIR] [--model MODEL]
+      --path: checkout lokal untuk osv-scanner. --model: model LLM untuk garak/deepteam.
       Jalankan satu scanner klasik on-demand dalam scope program.
       Binary tidak ada -> dilewati (bukan error). Hasil = kandidat
       (UNVERIFIED) di store; review dulu di 'bounty review'.
@@ -141,20 +148,20 @@ async function cmdProvider(args) {
   }
 }
 
-async function cmdRun(args) {
+async function runSingleTarget(args, targetOverride = null) {
   const programPath = args.program || resolve(process.cwd(), "programs/example.md");
   if (!existsSync(programPath)) {
     console.error(`Program tidak ditemukan: ${programPath}`);
     console.error("Buat programs/<nama>.md dulu (Scope/Allowed/Denied/Budget/Rate/Roles).");
     try { logAudit({ command: "run", program: String(args.program || "example"), result: "error" }); } catch {}
-    return 2;
+    return { code: 2, usd: 0, added: 0, findings: [] };
   }
   const program = loadProgramFile(programPath);
-  const target = args.target || (program.allowedHosts[0] ? `https://${program.allowedHosts[0]}/` : "");
+  const target = targetOverride || args.target || (program.allowedHosts[0] ? `https://${program.allowedHosts[0]}/` : "");
   if (!target) {
     console.error("Target tidak diberikan dan program tanpa Scope.");
     try { logAudit({ command: "run", program: program.name, result: "error" }); } catch {}
-    return 2;
+    return { code: 2, usd: 0, added: 0, findings: [] };
   }
 
   // 1. Scope gate
@@ -176,7 +183,7 @@ async function cmdRun(args) {
   const role = String(args.role || "low").toLowerCase();
   if (!program.roles.includes(role)) {
     console.error(`Role "${role}" tidak diizinkan program ini (roles: ${program.roles.join(", ")}).`);
-    return done(2, "blocked");
+    return { code: done(2, "blocked"), usd: 0, added: 0, findings: [] };
   }
   const profile = getRoleProfile(program, role);
   console.log(`Budget: $${budget} | Role: ${profile.role} | Rate: ${program.rateLimit}/detik`);
@@ -190,9 +197,9 @@ async function cmdRun(args) {
       console.log(`[dry-run] skills-dir: ${SKILLS_DIR} (akan diteruskan ke Strix via --skills-dir / STRIX_SKILLS_DIR)`);
       console.log("[dry-run] Instruksi yang akan dikirim ke Strix:");
       console.log(buildInstruction(program, role));
-      return done(0, "dry-run");
+      return { code: done(0, "dry-run"), usd: 0, added: 0, findings: [] };
     }
-    return done(2, "error");
+    return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
   }
 
   // 4. Pre-exec guard + rate limiter
@@ -210,7 +217,7 @@ async function cmdRun(args) {
   const guard = checkCommand(cmd, process.cwd());
   if (!guard.allowed) {
     console.error(`Perintah diblokir guard: ${guard.reason}`);
-    return done(2, "blocked");
+    return { code: done(2, "blocked"), usd: 0, added: 0, findings: [] };
   }
   await bucket.acquire();
 
@@ -218,7 +225,7 @@ async function cmdRun(args) {
     console.log(`[dry-run] strix ditemukan di ${strix}; perintah yang akan jalan: ${cmd}`);
     console.log(`[dry-run] skills-dir: ${skillsDir ?? "(tidak ditemukan — skill tidak diteruskan)"}`);
     console.log(buildInstruction(program, role));
-    return done(0, "dry-run");
+    return { code: done(0, "dry-run"), usd: 0, added: 0, findings: [] };
   }
 
   // 5. Jalankan Strix (tanpa API berbayar dari wrapper ini — Strix memakai
@@ -232,12 +239,13 @@ async function cmdRun(args) {
     // Privasi tim: telemetri Strix dimatikan (default Strix = 1).
     env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), STRIX_TELEMETRY: "0" },
   });
-  if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return done(2, "error"); }
+  if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return { code: done(2, "error"), usd: 0, added: 0, findings: [] }; }
   const stdout = String(res.stdout ?? "");
   const stderr = String(res.stderr ?? "");
   if (stdout) process.stdout.write(stdout);
   if (stderr) process.stderr.write(stderr);
 
+  let runUsd = 0, runAdded = 0, runFindings = [];
   // 6. Parse output Strix -> store (run -> store -> review).
   //    Semua temuan masuk sebagai "candidate" (UNVERIFIED) — reviewer
   //    yang memutuskan di `bounty review`. Dedup dulu vs store + internal.
@@ -252,7 +260,20 @@ async function cmdRun(args) {
     try {
       const parsed = parseStrixOutput(stdout + "\n" + stderr, program.name);
       const artifacts = readStrixArtifacts(process.cwd(), startedAt);
-      const findings = [...parsed.findings, ...artifacts.findings.map((f) => ({ ...f, program: program.name }))];
+      // SARIF Strix (findings.sarif) sebagai sumber ketiga, bila ada.
+      let sarifFindings = [];
+      try {
+        const runsBase = join(process.cwd(), "strix_runs");
+        if (existsSync(runsBase)) {
+          const dirs = readdirSync(runsBase, { withFileTypes: true })
+            .filter((d) => d.isDirectory())
+            .map((d) => join(runsBase, d.name))
+            .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+          if (dirs.length > 0) sarifFindings = readSarif(join(dirs[0], "findings.sarif")).map((f) => ({ ...f, program: program.name }));
+        }
+      } catch {}
+      if (sarifFindings.length > 0) console.log(`Artefak Strix: ${sarifFindings.length} temuan dari strix_runs/findings.sarif.`);
+      const findings = [...parsed.findings, ...artifacts.findings.map((f) => ({ ...f, program: program.name })), ...sarifFindings];
       const usd = artifacts.usd > 0 ? artifacts.usd : parsed.usd;
       if (artifacts.findings.length > 0) console.log(`Artefak Strix: ${artifacts.findings.length} temuan dari strix_runs/vulnerabilities.json${artifacts.usd > 0 ? `, biaya $${artifacts.usd} dari run.json` : ""}.`);
       const existing = store.listCandidates(program.name, "candidate")
@@ -265,6 +286,11 @@ async function cmdRun(args) {
         added++;
       }
       store.addRun({ version: "bounty", target, lab: program.name, tp: 0, fp: 0, fn: 0, timeMs: Date.now() - startedAt, usd });
+      runUsd = usd; runAdded = added; runFindings = fresh;
+      // v1.3 cost tracking nyata: peringatan saat mendekati budget.
+      const bs = budgetStatus({ spent: usd, budget });
+      if (bs.exceeded) console.log(`Peringatan: biaya $${usd} sudah MELEBIHI budget $${budget} untuk target ini.`);
+      else if (bs.warn) console.log(`Peringatan: biaya $${usd} sudah ${Math.round(bs.pct * 100)}% dari budget $${budget}.`);
       console.log(`\nHasil parse: ${findings.length} temuan dari output Strix, ${added} kandidat baru masuk store (dedup: ${findings.length - added} duplikat). Biaya terukur: $${usd}.`);
       console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
       // v1.2 memori: episode per run + coverage kelas yang diperiksa +
@@ -281,7 +307,48 @@ async function cmdRun(args) {
       } catch (e) { console.error(`Peringatan: gagal menulis memori: ${e.message}`); }
     } finally { store.close(); }
   } catch (e) { console.error(`Peringatan: gagal menyimpan hasil ke store: ${e.message}`); }
-  return done(strixOk ? 0 : code, strixOk ? (code === 2 ? "ok-findings" : "ok") : "failed");
+  return { code: done(strixOk ? 0 : code, strixOk ? (code === 2 ? "ok-findings" : "ok") : "failed"), usd: runUsd, added: runAdded, findings: runFindings };
+}
+
+// v1.3 multi-target: `bounty run --targets url1,url2` menjalankan target
+// satu per satu (bukan paralel) dengan satu pool budget --budget; antrean
+// berhenti bila biaya total mencapai budget. Satu target = perilaku lama.
+async function cmdRun(args) {
+  if (args.targets) {
+    const targets = String(args.targets).split(",").map((t) => t.trim()).filter(Boolean);
+    if (targets.length === 0) { console.error("--targets butuh daftar URL dipisah koma."); return 2; }
+    let budget = DEFAULT_BUDGET_USD;
+    try {
+      const programPath = args.program || resolve(process.cwd(), "programs/example.md");
+      const program = loadProgramFile(programPath);
+      budget = Number(args.budget ?? program.maxBudgetUsd ?? DEFAULT_BUDGET_USD);
+    } catch {}
+    console.log(`Antrean multi-target: ${targets.length} target, budget total $${budget} (berhenti bila tercapai).`);
+    const summary = await runQueue(targets, async (t) => {
+      const r = await runSingleTarget({ ...args, target: t }, t);
+      return { status: r.code === 0 ? "ok" : "failed", usd: r.usd, findings: r.findings };
+    }, {
+      budget,
+      onProgress: (p) => console.log(`[${p.done}/${p.total}] ${p.target}: ${p.status}, $${p.usd} (total $${p.totalUsd})`),
+    });
+    console.log(`Antrean selesai: ${summary.done}/${summary.total} target, total biaya $${summary.totalUsd}${summary.stopped ? " (berhenti: budget habis)" : ""}.`);
+    return summary.stopped || summary.results.every((r) => r.status === "ok" || r.status === "done") ? 0 : 2;
+  }
+  const r = await runSingleTarget(args);
+  return r.code;
+}
+
+function cmdView() {
+  // Tautkan ke dashboard Strix (jangan bangun dashboard sendiri).
+  const strix = findBinary("strix");
+  if (!strix) { console.log("Strix tidak ditemukan — instal dulu: bounty install --strix"); return 2; }
+  console.log("Membuka dashboard Strix (strix view) di background — bukan dashboard bounty.");
+  try {
+    const child = spawn(strix, ["view"], { detached: true, stdio: "ignore" });
+    child.unref();
+    console.log("Dashboard Strix berjalan di background. Tutup dengan menghentikan proses strix.");
+    return 0;
+  } catch (e) { console.error(`Gagal membuka strix view: ${e.message}`); return 2; }
 }
 
 function cmdReview(args) {
@@ -521,6 +588,8 @@ async function cmdScan(args) {
     program,
     timeoutMs: Number(args["timeout-ms"] ?? 120000),
     wordlist: args.wordlist,
+    localPath: args.path,
+    model: args.model,
   });
   if (result.error) {
     console.error(result.error);
@@ -611,6 +680,7 @@ export async function main(argv = process.argv.slice(2)) {
   switch (cmd) {
     case "provider": return await cmdProvider(args);
     case "run": return await cmdRun(args);
+    case "view": return cmdView();
     case "review": return cmdReview(args);
     case "programs": return cmdPrograms();
     case "findings": return cmdFindings(args);

@@ -1,4 +1,4 @@
-// tests/production.test.js — Slice C: produksi v1.2.0.
+// tests/production.test.js — Slice C: produksi v1.3.0.
 // Cek dokumen produksi + .env.example + CI, tanpa network/Docker/Strix.
 // Pola secret: cari awalan key asli (sk-, AKIA, ghp_) — placeholder
 // REPLACE-ME dan contoh palsu (example.invalid) bukan secret asli.
@@ -27,7 +27,7 @@ test('production: .env.example hanya placeholder, tanpa secret asli', () => {
   assert.doesNotMatch(env, /xox[baprs]-[A-Za-z0-9-]{10,}/);
 });
 
-test('production: CHANGELOG menyebut 1.2.0', () => {
+test('production: CHANGELOG menyebut 1.3.0', () => {
   const log = read('CHANGELOG.md');
   assert.match(log, /\[1\.1\.0\]/);
   assert.match(log, /2026-11-23/);
@@ -59,9 +59,9 @@ test('production: TEAM.md, SECURITY.md, CONTRIBUTING.md ada dan tidak kosong', (
   assert.match(read('CONTRIBUTING.md'), /REPLACE-ME/);
 });
 
-test('production: package.json version 1.2.0', () => {
+test('production: package.json version 1.3.0', () => {
   const pkg = JSON.parse(read('package.json'));
-  assert.equal(pkg.version, '1.2.0');
+  assert.equal(pkg.version, '1.3.0');
 });
 
 test('production: docs P2 ada dan tidak kosong', () => {
