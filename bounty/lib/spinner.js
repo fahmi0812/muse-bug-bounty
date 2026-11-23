@@ -65,6 +65,18 @@ export class Spinner {
     this.text = stripAnsi(text);
   }
 
+  // Cetak satu baris status sebagai baris sendiri di atas spinner
+  // (dipakai untuk baris output anak yang informatif, supaya proses
+  // kerja nampak selagi jalan — bukan cuma di baris spinner).
+  // Di pipe/CI (bukan TTY) diam total; baris tetap tampil di dump
+  // akhir seperti biasa.
+  printLine(text) {
+    if (!this.enabled) return;
+    this.clear();
+    this.stream.write(`${stripAnsi(text)}\n`);
+    this.render();
+  }
+
   stop() {
     if (!this.enabled) return;
     if (this.timer) {

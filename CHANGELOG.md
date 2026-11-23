@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.9] — 2026-11-24
+
+### Added
+- **`bounty run` kini menampilkan baris status Strix secara live** (bukan cuma di baris spinner). Alasan: UI real-time penuh Strix hanya muncul bila Strix jalan langsung di terminal; di dalam wrapper output-nya di-pipe supaya temuan bisa diparse ke store, jadi Strix jalan headless dan hanya mencetak baris status sesekali — di antaranya LLM berpikir dalam diam, sehingga proses kerja tidak nampak. Sekarang setiap baris output Strix yang informatif dicetak live sebagai baris sendiri di atas spinner (garis simbol progress bar tetap ditolak; baris yang sama beruntun dicetak sekali). Baris live tampil dua kali — sekali live, sekali di dump akhir — sengaja: live = proses, dump = rekaman lengkap. `Spinner.printLine()` + 2 tes unit.
+
 ## [1.13.8] — 2026-11-24
 
 ### Fixed

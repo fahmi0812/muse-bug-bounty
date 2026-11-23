@@ -56,6 +56,29 @@ test('spinner: teks panjang dipotong sesuai lebar terminal', () => {
   sp.stop();
 });
 
+test('spinner: printLine cetak baris sendiri di atas spinner, lalu spinner lanjut', async () => {
+  const stream = fakeStream();
+  const sp = new Spinner({ stream, enabled: true });
+  sp.start('Strix sedang bekerja…');
+  await sleep(150);
+  sp.printLine('Scanning endpoints…');
+  const joined = stream.writes.join('');
+  assert.ok(joined.includes('Scanning endpoints…\n'), 'baris live harus tercetak + newline');
+  const countAfter = stream.writes.length;
+  await sleep(250);
+  assert.ok(stream.writes.length > countAfter, 'spinner harus tetap jalan setelah printLine');
+  sp.stop();
+});
+
+test('spinner: printLine diam bila disabled (pipe/CI)', () => {
+  const stream = fakeStream();
+  const sp = new Spinner({ stream, enabled: false });
+  sp.start('Strix sedang bekerja…');
+  sp.printLine('Scanning endpoints…');
+  sp.stop();
+  assert.equal(stream.writes.length, 0);
+});
+
 // Kasus nyata 24 Nov 2026: spinner menampilkan "garis doang" — baris
 // output Strix selagi pull image adalah garis simbol, bukan kata-kata.
 test('spinner: isInformative tolak garis simbol, terima baris berk kata', () => {

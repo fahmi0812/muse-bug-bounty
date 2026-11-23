@@ -20,7 +20,7 @@ function runCli(args, env = {}) {
 test("v1.10 CLI: --version mencetak 1.12.0", () => {
   const r = runCli(["--version"]);
   assert.equal(r.status, 0, r.stderr);
-  assert.match(r.stdout, /bounty v1.13.8/);
+  assert.match(r.stdout, /bounty v1.13.9/);
 });
 
 test("v1.10 CLI: programs tampil sebagai tabel ber-header", () => {

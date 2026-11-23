@@ -17,7 +17,7 @@ function runBounty(args, env = {}) {
 
 test("v1.12.0: --version + firmware tanpa tool -> exit 2 (tool tidak dikenal) / skipped", () => {
   const v = runBounty(["--version"]);
-  assert.match(v.stdout, /bounty v1.13.8/);
+  assert.match(v.stdout, /bounty v1.13.9/);
   const bad = runBounty(["firmware", "--tool", "tidak-ada", "--file", "x.bin"]);
   assert.equal(bad.status, 2);
   const noFile = runBounty(["firmware", "--tool", "binwalk-ng"]);

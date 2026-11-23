@@ -63,7 +63,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.8";
+export const VERSION = "1.13.9";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -699,6 +699,9 @@ async function runSingleTarget(args, targetOverride = null) {
   const spinner = new Spinner();
   spinner.start("Strix sedang bekerja…");
   let res;
+  // Baris live terakhir yang sudah dicetak (hindari duplikat beruntun).
+  let lastLiveLine = "";
+  let lastPhase = "";
   try {
     res = await new Promise((resolve) => {
       const child = spawn(strix, [...strixArgs, "--instruction", instruction], {
@@ -711,15 +714,30 @@ async function runSingleTarget(args, targetOverride = null) {
       const feed = (text, isErr) => {
         if (isErr) stderr += text; else stdout += text;
         // Baris terakhir output (pisah \n dan \r — progress Docker
-        // memakai \r) jadi teks spinner — TAPI hanya bila barisnya
-        // informatif (ada kata-kata). Garis simbol progress bar /
-        // separator (━, █, ─) ditolak supaya spinner tidak berubah
-        // jadi "garis doang"; teks bagus terakhir dipertahankan.
+        // memakai \r) jadi teks spinner + dicetak live sebagai baris
+        // sendiri, supaya proses kerja Strix nampak selagi jalan.
+        // (UI real-time penuh Strix hanya muncul bila Strix jalan
+        // langsung di terminal; di sini output-nya di-pipe supaya
+        // wrapper bisa mem-parse temuan ke store, jadi Strix jalan
+        // headless dan hanya mencetak baris status sesekali — di
+        // antara baris itu LLM berpikir dalam diam. Baris live ini
+        // tampil dua kali — sekali live, sekali di dump akhir —
+        // sengaja: live = proses, dump = rekaman lengkap.)
+        // Hanya baris informatif yang dicetak; garis simbol progress
+        // bar / separator (━, █, ─) ditolak supaya tidak jadi "garis
+        // doang"; baris yang sama beruntun dicetak sekali saja.
         const lines = String(text).split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
         for (const line of lines) {
           const phase = phaseText(line);
-          if (phase) { spinner.update(phase); continue; }
-          if (isInformative(line)) spinner.update(line);
+          if (phase) {
+            spinner.update(phase);
+            if (phase !== lastPhase) { lastPhase = phase; spinner.printLine(phase); }
+            continue;
+          }
+          if (isInformative(line)) {
+            spinner.update(line);
+            if (line !== lastLiveLine) { lastLiveLine = line; spinner.printLine(line); }
+          }
         }
       };
       child.stdout.on("data", (chunk) => feed(chunk, false));
