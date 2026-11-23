@@ -26,6 +26,14 @@ export const KL_DENYLIST = [
   { name: "hackingtool", re: /hackingtool/i, reason: "tool hackingtool (kategori K) diblokir" },
   { name: "aktivator", re: /\b(aktivator|activator)\b/i, reason: "tool aktivator/bypass lisensi (kategori L) diblokir" },
   { name: "captcha-solver", re: /captcha[-_ ]?(solver|solving|bypass)/i, reason: "captcha solver/bypass (kategori L) diblokir" },
+  // P2-5 (do-not-build): WiFi + C2 / post-exploitation di luar scope bounty.
+  { name: "wifite", re: /\bwifite\b/i, reason: "tool WiFi (wifite) di luar scope bounty diblokir" },
+  { name: "aircrack", re: /\baircrack(-ng)?\b/i, reason: "tool WiFi (aircrack) di luar scope bounty diblokir" },
+  { name: "bettercap", re: /\bbettercap\b/i, reason: "tool WiFi/MITM (bettercap) di luar scope bounty diblokir" },
+  { name: "sliver", re: /\bsliver\b/i, reason: "framework C2 (sliver) di luar scope bounty diblokir" },
+  { name: "covenant", re: /\bcovenant\b/i, reason: "framework C2 (covenant) di luar scope bounty diblokir" },
+  { name: "mythic", re: /\bmythic\b/i, reason: "framework C2 (mythic) di luar scope bounty diblokir" },
+  { name: "cobalt-strike", re: /cobalt[-_ ]?strike/i, reason: "framework C2 (cobalt strike) di luar scope bounty diblokir" },
 ];
 
 // Pola bypass red-team: perintah destruktif yang disembunyikan lewat

@@ -4,6 +4,18 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.7.0] — 2026-11-23
+
+### Added
+- **v1.7 — semua P2 deep research (P2-1 s.d. P2-6), berurutan:**
+  - **P2-1 Firmware ringan:** `bounty/lib/firmware.js` — `bounty firmware --tool binwalk-ng|unblob|cve-bin-tool --file <image>` (binwalk-ng 4.0, unblob 26.6.4, cve-bin-tool 3.4; file lokal saja, timeout 600 dtk, CVE → temuan "Known CVE in Firmware Component" dengan severity dari CVSS, bukti reachability wajib manual). EMBA sengaja TIDAK di-wire (14–25 jam/image, ~20 GB Docker — opt-in semalam, lihat `docs/firmware.md`). 8 test.
+  - **P2-2 DVLAA:** `eval/benchmarks/dvlaa.md` + `eval/dvlaa-export.mjs` (`npm run dvlaa-export`) — DVLAA (Damnn Vulnerable LLM and Agent Application, Tcotl/DVLAA, 81 tantangan: 24 OWASP LLM + 10 Agent + 11 gabungan + 30 AWDP + 6 model-poisoning; skor = Flag per tantangan via UI). Eksportir memakai format kompatibel EthiBench + petunjuk `challenge` (LLM01/ASI02/AWDP07) — **best-effort, bukan format resmi** (DVLAA tidak mendefinisikan format pengiriman temuan). Lisensi DVLAA **Unknown** — jalankan sebagai lab saja, jangan vendor kodenya. 5 test.
+  - **P2-3 Promptfoo CI gate:** `bounty/lib/promptfoo-gate.js` — `bounty promptfoo-gate --results <hasil.json> [--min-pass-rate 0.8]` (fail-closed: tanpa hasil/kunci = gagal, bukan lolos) + `eval/promptfoo/promptfooconfig.yaml` (6 kasus harness llm-app + bagian redteam) + `docs/promptfoo-gate.md`. Langkah CI-nya dipasang lewat web UI (workflow tidak bisa lewat API). 6 test.
+  - **P2-4 Graph gate:** `bounty/lib/graph-gate.js` — `bounty graph-gate [--baseline eval/results/baseline.json]` (keputusan upgrade graf/memori: "upgrade" hanya bila baseline membuktikan planning/state adalah bottleneck — sinyal tp-down ≥2 lab, FP berulang ≥3 kelas, open-coverage ≥5, temuan tanpa chain >50%; tanpa baseline jawabannya selalu "tetap SQL") + `eval/benchmarks/graph-gate.md`. 5 test.
+  - **P2-5 WiFi/C2 do-not-build:** dikunci di kode — `KL_DENYLIST` di `bounty/lib/guard.js` kini menolak `wifite`, `aircrack`, `bettercap`, `sliver`, `covenant`, `mythic`, `cobalt-strike` + `docs/p2-wifi-c2.md` (alasan: di luar scope bounty, risiko hukum, merusak janji ringan). 8 test.
+  - **P2-6 Installer pdtm/go/pipx:** `scripts/install-tools.sh` (mode rencana = default, `--yes` baru menjalankan; `--pd-only`/`--go-only`/`--python-only`; pdtm + 5 tool PD, `go install` jsluice + interactsh-client, `pipx install` garak + pyrit) + `docs/install-tools.md`. Winget resmi **masih belum live** — skrip ini jalur yang didukung. 6 test.
+- **Batasan jujur v1.7.0:** tidak ada satu pun runner P2 yang pernah jalan live (binary tidak ada di VM — flag CLI + bentuk output best-effort, verifikasi `--help` masing-masing di laptop); DVLAA belum pernah jalan (butuh laptop, RAM 8 GB+ disarankan); promptfoo belum pernah jalan live (butuh provider key); graph gate belum pernah memutuskan "upgrade" (baseline belum ada); baseline live P0-1 + oracle LLMVault tetap menunggu laptop.
+
 ## [1.6.0] — 2026-11-23
 
 ### Added

@@ -37,10 +37,13 @@ import { runGhidraMcp, runRea, runJadxApk } from "../lib/reverse.js";
 import { runMobsf, runJadx } from "../lib/mobile.js";
 import { startCaidoMcp, listRequests, replayRequest, stopCaidoMcp } from "../lib/caido.js";
 import { getProgramScope, searchHacktivity, draftReport, syncScopeToProgram } from "../lib/platforms.js";
+import { runBinwalkNg, runUnblob, runCveBinTool } from "../lib/firmware.js";
+import { readPromptfooResults, gateResults } from "../lib/promptfoo-gate.js";
+import { decideGraphUpgrade } from "../lib/graph-gate.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
-export const VERSION = "1.6.0";
+export const VERSION = "1.7.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -133,6 +136,16 @@ Penggunaan:
       tidak menulis file).
   bounty patterns [--skill <nama>]
       Pustaka pola laporan: total, bersitasi, per skill (+ bonus router).
+  bounty firmware --tool binwalk-ng|unblob|cve-bin-tool --file <image> [--program P]
+      Analisis firmware lokal (file saja, bukan URL). EMBA sengaja tidak
+      di-wire (opt-in semalam via Docker, lihat docs/firmware.md).
+  bounty promptfoo-gate --results <hasil.json> [--min-pass-rate 0.8]
+      Gerbang CI red-team: baca hasil promptfoo eval, lolos hanya bila
+      pass rate >= ambang. Tanpa hasil/kunci -> gagal (bukan lolos diam-diam).
+  bounty graph-gate [--baseline eval/results/baseline.json]
+      Keputusan upgrade graf/memori: hanya "upgrade" bila baseline
+      membuktikan planning/state adalah bottleneck; tanpa baseline
+      jawabannya selalu "tetap SQL".
   bounty install [--strix]
       Cek/instal Strix via curl resmi (hanya tampilkan perintah, tidak auto-run pipe-to-shell).
   bounty --help | bounty --version
@@ -1081,6 +1094,100 @@ async function cmdCaido(args) {
   } finally { stopCaidoMcp(session); }
 }
 
+const FIRMWARE_TOOLS = ["binwalk-ng", "unblob", "cve-bin-tool"];
+async function cmdFirmware(args) {
+  const tool = String(args.tool ?? "").toLowerCase();
+  const file = args.file || args.target;
+  const programPath = args.program || resolve(process.cwd(), "programs/example.md");
+  if (!FIRMWARE_TOOLS.includes(tool)) {
+    console.error(`--tool wajib: ${FIRMWARE_TOOLS.join(" | ")} (dapat: "${tool || ""}")`);
+    return 2;
+  }
+  if (!file) {
+    console.error("--file wajib (path image firmware lokal).");
+    return 2;
+  }
+  if (!existsSync(programPath)) {
+    console.error(`Program tidak ditemukan: ${programPath}`);
+    return 2;
+  }
+  const program = loadProgramFile(programPath);
+  let result;
+  if (tool === "binwalk-ng") result = runBinwalkNg(file, {});
+  else if (tool === "unblob") result = runUnblob(file, {});
+  else result = runCveBinTool(file, { sbomFile: args["sbom-file"] ?? null });
+  if (result.skipped) {
+    console.log(`Dilewati: ${tool} belum terinstal — lihat docs/firmware.md (scripts/install-tools.sh).`);
+    return 0;
+  }
+  if (result.error) {
+    console.error(`Error ${tool}: ${result.error}`);
+    return 2;
+  }
+  console.log(`${tool}: ${result.findings?.length ?? 0} temuan (${result.duplicates ?? 0} duplikat dibuang).`);
+  const stored = storeFindings(program, result.findings ?? []);
+  console.log(`Disimpan ke bounty.db: ${stored.added} kandidat baru.`);
+  return 0;
+}
+
+function cmdPromptfooGate(args) {
+  const resultsPath = args.results;
+  if (!resultsPath) {
+    console.error("--results <hasil promptfoo .json> wajib.");
+    return 2;
+  }
+  const minPassRate = Number(args["min-pass-rate"] ?? 0.8);
+  const results = readPromptfooResults(resultsPath);
+  const gate = gateResults(results, { minPassRate });
+  if (results.error) {
+    console.log(`Promptfoo gate: GAGAL — ${results.error} (fail-closed, bukan lolos).`);
+    return 1;
+  }
+  console.log(`Promptfoo gate: ${results.passed}/${results.total} lolos (${(results.passRate * 100).toFixed(0)}%, ambang ${(minPassRate * 100).toFixed(0)}%) — ${gate.pass ? "LOLOS" : "GAGAL"}.`);
+  if (!gate.pass && results.failures?.length) {
+    for (const f of results.failures.slice(0, 10)) console.log(`  - gagal: ${f.prompt} — ${f.assertion} (${f.reason})`);
+  }
+  return gate.pass ? 0 : 1;
+}
+
+function cmdGraphGate(args) {
+  const baselinePath = args.baseline || resolve(process.cwd(), "eval/results/baseline.json");
+  let baseline = null;
+  if (existsSync(baselinePath)) {
+    try { baseline = JSON.parse(readFileSync(baselinePath, "utf8")); } catch (e) {
+      console.error(`baseline.json rusak: ${e.message}`);
+      return 2;
+    }
+  }
+  const stats = {};
+  try {
+    const store = new Store();
+    try {
+      const lessons = listLessons(store.db);
+      const fpByClass = {};
+      for (const l of lessons) {
+        const outcome = String(l.outcome ?? l.verdict ?? "").toLowerCase();
+        if (outcome === "false_positive" || outcome === "false-positive" || outcome === "fp") {
+          fpByClass[String(l.vuln_class ?? l.skill ?? "")] = (fpByClass[String(l.vuln_class ?? l.skill ?? "")] ?? 0) + 1;
+        }
+      }
+      stats.repeatedFpClasses = Object.values(fpByClass).filter((n) => n >= 3).length;
+      stats.openCoverage = listCoverage(store.db).filter((c) => c.status === "open").length;
+      const all = store.listCandidates(null, "candidate");
+      stats.totalFindings = all.length;
+      try {
+        const row = store.db.prepare("SELECT COUNT(*) AS n FROM candidate c WHERE NOT EXISTS (SELECT 1 FROM evidence e WHERE e.finding_id = c.id)").get();
+        stats.untracedFindings = Number(row?.n ?? 0);
+      } catch { stats.untracedFindings = 0; }
+    } finally { store.close(); }
+  } catch { /* statistik opsional — gerbang tetap jalan tanpa baseline */ }
+  const decision = decideGraphUpgrade({ baseline, stats });
+  console.log(`Graph gate: ${decision.recommend === "upgrade" ? "UPGRADE" : "TETAP SQL"}`);
+  console.log(decision.reason);
+  for (const s of decision.signals) console.log(`  - ${s.name}: ${s.detail}`);
+  return 0;
+}
+
 function cmdPatterns(args) {
   const patterns = loadPatterns();
   const cited = citedPatterns(patterns);
@@ -1186,6 +1293,9 @@ export async function main(argv = process.argv.slice(2)) {
     case "cloud": return await cmdCloud(args);
     case "reverse": return await cmdReverse(args);
     case "caido": return await cmdCaido(args);
+    case "firmware": return await cmdFirmware(args);
+    case "promptfoo-gate": return cmdPromptfooGate(args);
+    case "graph-gate": return cmdGraphGate(args);
     case "install": return cmdInstall(args);
     default:
       console.error(`Perintah tidak dikenal: ${cmd}\n`);
