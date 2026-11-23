@@ -2,6 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.8] — 2026-11-24
+
+### Fixed
+- **Spinner run tidak lagi menampilkan "garis doang".** v1.13.7 menampilkan baris terakhir output Strix apa adanya — ternyata selagi pull image Docker, output Strix adalah garis simbol progress bar (━, █, ─) yang memenuhi satu baris penuh tanpa kata apa pun. Sekarang spinner hanya menampilkan baris yang informatif (cukup huruf, huruf mendominasi — `isInformative` di `bounty/lib/spinner.js`); garis simbol ditolak dan teks bagus terakhir dipertahankan. Baris fase pull image dikenali dan ditampilkan sebagai "Menarik image Docker Strix…".
+
 ## [1.13.7] — 2026-11-24
 
 ### Added

@@ -8,6 +8,34 @@ function stripAnsi(s) {
   return String(s ?? "").replace(/\x1b\[[0-9;]*[A-Za-z]/g, "");
 }
 
+// Layak tampil sebagai teks spinner atau tidak. Output Strix selagi pull
+// image Docker / progress bar adalah garis simbol (━, █, ─, ====) yang
+// kalau ditampilkan memenuhi satu baris penuh tanpa kata apa pun — persis
+// yang Fahmi lihat ("cuma garis doang"). Syarat: cukup huruf dan huruf
+// mendominasi isi baris; garis simbol ditolak.
+const JUNK_CHARS = /[─━│┃┌┐└┘├┤┬┴┼═║╔╗╚╝█▓▒░]/g;
+
+export function isInformative(line) {
+  const text = stripAnsi(line).trim();
+  if (text.length < 4) return false;
+  const nonSpace = text.replace(/\s/g, "");
+  if (nonSpace.length === 0) return false;
+  const letters = (text.match(/[a-zA-Z]/g) || []).length;
+  if (letters < 4) return false;
+  if (letters / nonSpace.length < 0.4) return false;
+  const junk = (text.match(JUNK_CHARS) || []).length;
+  if (junk / text.length > 0.1) return false;
+  return true;
+}
+
+// Fase yang dikenali dari baris output — tampilkan pesan yang jelas
+// (bukan baris mentahnya yang sering berupa progress bar).
+export function phaseText(line) {
+  const text = stripAnsi(line);
+  if (/pulling|pull image|downloading image/i.test(text)) return "Menarik image Docker Strix…";
+  return null;
+}
+
 export class Spinner {
   constructor({ stream = process.stderr, enabled = Boolean(stream?.isTTY) } = {}) {
     this.stream = stream;

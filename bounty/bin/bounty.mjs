@@ -18,7 +18,7 @@ import { getRoleProfile, buildInstruction } from "../lib/auth.js";
 import { detectModels, saveProvider, writeStrixConfig, loadProviders, loadProviderCreds, syncStrixConfig, buildStrixEnv, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
-import { Spinner } from "../lib/spinner.js";
+import { Spinner, isInformative, phaseText } from "../lib/spinner.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
 import { checkFailOn, severityFor } from "../lib/failon.js";
 import { color, table, summaryBox, formatUsd, progressBar, severityBadge, phaseLine, heading, hint } from "../lib/ui.js";
@@ -63,7 +63,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.7";
+export const VERSION = "1.13.8";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -711,9 +711,16 @@ async function runSingleTarget(args, targetOverride = null) {
       const feed = (text, isErr) => {
         if (isErr) stderr += text; else stdout += text;
         // Baris terakhir output (pisah \n dan \r — progress Docker
-        // memakai \r) jadi teks spinner.
+        // memakai \r) jadi teks spinner — TAPI hanya bila barisnya
+        // informatif (ada kata-kata). Garis simbol progress bar /
+        // separator (━, █, ─) ditolak supaya spinner tidak berubah
+        // jadi "garis doang"; teks bagus terakhir dipertahankan.
         const lines = String(text).split(/[\r\n]+/).map((l) => l.trim()).filter(Boolean);
-        if (lines.length > 0) spinner.update(lines[lines.length - 1]);
+        for (const line of lines) {
+          const phase = phaseText(line);
+          if (phase) { spinner.update(phase); continue; }
+          if (isInformative(line)) spinner.update(line);
+        }
       };
       child.stdout.on("data", (chunk) => feed(chunk, false));
       child.stderr.on("data", (chunk) => feed(chunk, true));

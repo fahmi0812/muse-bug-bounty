@@ -3,7 +3,7 @@
 // + baris terakhir output anak. Di pipe/CI diam total.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { Spinner } from '../bounty/lib/spinner.js';
+import { Spinner, isInformative, phaseText } from '../bounty/lib/spinner.js';
 
 function fakeStream() {
   const writes = [];
@@ -54,4 +54,25 @@ test('spinner: teks panjang dipotong sesuai lebar terminal', () => {
   assert.ok(line.length <= 42, `baris spinner tidak boleh meluber: ${line.length}`);
   assert.match(line, /…/);
   sp.stop();
+});
+
+// Kasus nyata 24 Nov 2026: spinner menampilkan "garis doang" — baris
+// output Strix selagi pull image adalah garis simbol, bukan kata-kata.
+test('spinner: isInformative tolak garis simbol, terima baris berk kata', () => {
+  assert.equal(isInformative('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━'), false);
+  assert.equal(isInformative('────────────────────────────────────────'), false);
+  assert.equal(isInformative('[██████████----------] 12MB/45MB'), false);
+  assert.equal(isInformative('====='), false);
+  assert.equal(isInformative('ok'), false);
+  assert.equal(isInformative('   '), false);
+  assert.equal(isInformative('Pulling fs layer'), true);
+  assert.equal(isInformative('Scanning endpoints…'), true);
+  assert.equal(isInformative('Strix sedang bekerja…'), true);
+  assert.equal(isInformative('Found 3 endpoints'), true);
+});
+
+test('spinner: phaseText kenali fase pull image Docker', () => {
+  assert.equal(phaseText('Pulling fs layer'), 'Menarik image Docker Strix…');
+  assert.equal(phaseText('Pulling image ghcr.io/usestrix/strix-sandbox:1.4.1'), 'Menarik image Docker Strix…');
+  assert.equal(phaseText('Scanning endpoints…'), null);
 });
