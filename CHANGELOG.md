@@ -2,10 +2,11 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
-## [Unreleased]
+## [1.13.1] — 2026-11-24
 
 ### Fixed
-- **Catatan: mode executable 755 TIDAK jadi dipakai.** Eksperimen instal global di VM membuktikan npm selalu memaksa +x pada file bin saat instal (sumber 644 pun terinstal 770 dan jalan) — jadi mode 644 di repo bukan penyebab "Permission denied" di laptop Fahmi, dan push snapshot ternyata menyimpan mode 100644 apa pun yang ada di index (remote `356b2f6` tetap 100644). Commit mode 755 sudah dikembalikan ke 644. Penyebab Permission denied di laptop masih diselidiki — kemungkinan instal global terakhir tidak selesai mengganti file, atau symlink `~/.local/bin/bounty` menunjuk ke tempat lain; diagnosis via `ls -l` di laptop.
+- **`bounty run` — guard tidak lagi memblokir run dari folder mana saja.** Penyebab "Perintah diblokir guard: perintah keluar dari workspace diblokir" saat Fahmi run dari `~/Downloads/UNF/cy1/degre`: guard memakai cwd sebagai workspace, sementara `--skills-dir` menunjuk ke folder instal bounty (di luar cwd) — jadi setiap run dari luar clone selalu diblokir. Kini `checkCommand` menerima `allowRoots`: folder instal tool sendiri (berisi `skills/`) diizinkan sebagai rujukan path absolut; aturan blokir lain (rm, pipe-to-shell, denylist K/L, file rahasia, path absolut di luar workspace+allowRoots) tetap berlaku penuh.
+- **`bounty update` — pulihkan +x bin setelah instal (self-heal).** Akar masalah "Permission denied" akhirnya ketemu: instal global dari folder lokal itu symlink ke clone (bukan salinan), dan npm memberi +x pada file bin di clone saat instal — tapi `git restore`/`git stash`/`git pull` mengembalikan mode file ke 644 yang terlacak, sehingga binary global ikut kehilangan +x. Kini `bounty update` menjalankan `chmod 755` pada `bounty/bin/bounty.mjs` setelah instal (best-effort). Catatan: percobaan melacak mode 755 di git dibatalkan — push snapshot menyimpan mode 100644 apa pun isi index, dan eksperimen membuktikan npm selalu memaksa +x saat instal, jadi mode di repo bukan penyebabnya.
 
 ## [1.13.0] — 2026-11-24
 

@@ -4,7 +4,7 @@
 // File yang tidak pernah diedit pengguna (mis. mode bounty.mjs yang berubah
 // sendiri setelah npm install -g) tidak lagi menggagalkan update: perubahan
 // itu di-stash dulu, lalu dikembalikan bila memungkinkan.
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, chmodSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { execFileSync, spawnSync } from "node:child_process";
 import { homedir } from "node:os";
@@ -103,6 +103,12 @@ export function runUpdate({ dir, dryRun = false, install = defaultInstall } = {}
       }
     }
     install(dir);
+    // Instal global dari folder lokal = symlink ke clone; git restore/stash/
+    // pull bisa mengembalikan mode bin ke 644 (tracked) sehingga binary
+    // global ikut kehilangan +x. Pulihkan izin eksekusi (best-effort).
+    try {
+      chmodSync(join(dir, "bounty", "bin", "bounty.mjs"), 0o755);
+    } catch {}
   } catch (e) {
     // Bila pull gagal setelah stash, stash tetap ada — beri tahu pengguna.
     if (stashed && stashRestored === null) {

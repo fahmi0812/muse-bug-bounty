@@ -83,6 +83,24 @@ test("update: file lokal kotor di-stash, pull jalan, lalu dikembalikan", () => w
   assert.equal(git(clone, "stash", "list").trim(), ""); // tidak ada stash tertinggal
 }));
 
+test("update: bin dikembalikan executable setelah update", () => withTmp((base) => {
+  const origin = makeRepo(join(base, "origin"), "1.0.0");
+  const clone = join(base, "clone");
+  git(base, "clone", "-q", origin, clone);
+  writeFileSync(join(origin, "README.md"), "remote\n");
+  git(origin, "add", ".");
+  git(origin, "commit", "-m", "remote");
+  // Simulasikan kondisi laptop: bin 644 (git restore/stash mengembalikannya).
+  mkdirSync(join(clone, "bounty", "bin"), { recursive: true });
+  const bin = join(clone, "bounty", "bin", "bounty.mjs");
+  writeFileSync(bin, "#!/usr/bin/env node\n");
+  execFileSync("chmod", ["644", bin]);
+  const r = runUpdate({ dir: clone, install: fakeInstall });
+  assert.equal(r.to, "1.0.0");
+  const mode = Number.parseInt(execFileSync("stat", ["-c", "%a", bin], { encoding: "utf8" }).trim(), 8);
+  assert.ok(mode & 0o111, `bin harus executable, mode ${mode.toString(8)}`);
+}));
+
 test("update: dry-run tidak mengubah apa pun", () => withTmp((base) => {
   const origin = makeRepo(join(base, "origin"), "1.0.0");
   const clone = join(base, "clone");

@@ -60,7 +60,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.0";
+export const VERSION = "1.13.1";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -631,7 +631,9 @@ async function runSingleTarget(args, targetOverride = null) {
   const strixArgs = ["--target", target, "--budget", String(budget), "--max-budget-usd", String(budget), "--max-turns", String(maxTurns)];
   if (skillsDir) strixArgs.push("--skills-dir", skillsDir);
   const cmd = `strix ${strixArgs.join(" ")}`;
-  const guard = checkCommand(cmd, process.cwd());
+  // Guard workspace = cwd pengguna (boleh jalan dari folder mana saja),
+  // plus folder instal tool sendiri (skills/ tinggal di sana).
+  const guard = checkCommand(cmd, process.cwd(), { allowRoots: [REPO_ROOT] });
   if (!guard.allowed) {
     console.error(`Perintah diblokir guard: ${guard.reason}`);
     return { code: done(2, "blocked"), usd: 0, added: 0, findings: [] };

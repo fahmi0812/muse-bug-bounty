@@ -77,9 +77,17 @@ const SECRET_PATTERNS = [
   { name: "jwt", re: /eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/ },
 ];
 
-function escapesWorkspace(cmd, workspace) {
+function isInsideRoots(p, roots) {
+  return roots.some((root) => {
+    const rel = relative(resolve(root), p);
+    return rel === "" || !(rel === ".." || rel.startsWith(`..${sep}`));
+  });
+}
+
+function escapesWorkspace(cmd, workspace, allowRoots = []) {
   if (!workspace) return false;
   const ws = resolve(workspace);
+  const roots = [ws, ...allowRoots.map((r) => resolve(r))];
   // ".." segments that walk out of the workspace.
   const tokens = cmd.split(/[\s;"'&|<>]+/).filter(Boolean);
   for (const tok of tokens) {
@@ -87,7 +95,7 @@ function escapesWorkspace(cmd, workspace) {
       // A ".." that resolves outside the workspace is blocked.
       const cleaned = tok.replace(/^['"]|['"]$/g, "");
       if (isAbsolute(cleaned)) {
-        if (relative(ws, resolve(cleaned)).startsWith("..")) return true;
+        if (!isInsideRoots(resolve(cleaned), roots)) return true;
       } else if (cleaned.startsWith("..")) {
         return true;
       }
@@ -95,8 +103,7 @@ function escapesWorkspace(cmd, workspace) {
     // Absolute path outside the workspace (write targets / reads of secrets).
     if (isAbsolute(tok.replace(/^['"]|['"]$/g, ""))) {
       const p = resolve(tok.replace(/^['"]|['"]$/g, ""));
-      const rel = relative(ws, p);
-      if (rel.startsWith("..") || rel.startsWith(`..${sep}`)) {
+      if (!isInsideRoots(p, roots)) {
         // Allowlist: reading well-known system binaries/configs is not a write;
         // but any absolute path outside workspace is treated as escape here
         // unless it is a plain command name under /usr/bin, /bin, /usr/local/bin.
@@ -107,7 +114,7 @@ function escapesWorkspace(cmd, workspace) {
   return false;
 }
 
-export function checkCommand(cmd, workspace = process.cwd()) {
+export function checkCommand(cmd, workspace = process.cwd(), opts = {}) {
   const command = String(cmd ?? "").trim();
   if (!command) return { allowed: false, reason: "perintah kosong" };
 
@@ -123,7 +130,11 @@ export function checkCommand(cmd, workspace = process.cwd()) {
   for (const re of SECRET_FILE_PATTERNS) {
     if (re.test(command)) return { allowed: false, reason: "akses file rahasia diblokir (.env/.pem/.key/id_rsa/credentials/.aws/.ssh)" };
   }
-  if (escapesWorkspace(command, workspace)) {
+  // allowRoots: direktori milik tool sendiri (mis. folder instal bounty
+  // berisi skills/) — perintah sah boleh merujuk file di sana meski cwd
+  // pengguna ada di folder lain. Hanya memengaruhi aturan path absolut;
+  // pola blokir di atas tetap berlaku penuh.
+  if (escapesWorkspace(command, workspace, opts.allowRoots || [])) {
     return { allowed: false, reason: "perintah keluar dari workspace diblokir" };
   }
   return { allowed: true, reason: "OK" };
