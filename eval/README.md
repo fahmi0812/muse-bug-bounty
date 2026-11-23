@@ -65,6 +65,18 @@ ditemukan = FN. Duplikat temuan yang sama dihitung sekali (dedup).
 Oracle ini **awal** — dirawat seiring lab di-update (versi lab dicatat
 di tiap file; verifikasi ulang endpoint saat lab di-upgrade).
 
+## Baseline P0-1 (laptop — XBEN + EthiBench)
+
+`sh scripts/baseline-laptop.sh` (atau `npm run baseline:laptop`) —
+langkah 1: lab lokal 3 run (baseline vs bounty) via
+`npm run measure-baseline -- --runs=3 --mode=both`;
+langkah 2–3: panduan XBEN subset dan EthiBench di
+`eval/benchmarks/xben.md` dan `eval/benchmarks/ethibench.md`.
+Eksportir temuan → EthiBench:
+`npm run ethibench-export -- --in findings.json --target vuln-bank --run 1`.
+Semua langkah live butuh Docker + Strix + model di laptop; script
+keluar 2 bila prasyarat hilang (bukan mock diam-diam).
+
 ## Ambang gate
 
 Median lintas 3–5 run per lab (`eval/results/latest.json`):

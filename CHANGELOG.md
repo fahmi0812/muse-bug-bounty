@@ -4,6 +4,16 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-11-23
+
+### Added
+- **v1.4 — Baseline pack P0-1 (dari deep research gap report):**
+  - **`eval/benchmarks/xben.md`:** prosedur XBEN (usestrix/benchmarks, 104 tantangan) — setup Poetry, `run_infer.py`, subset 10 tantangan yang disarankan untuk sinyal awal, angka acuan Strix v0.4.0 (100/104, ~$3,37/tantangan — angka upstream, bukan angka kita), aturan jujur (model/budget/daftar tantangan sama, 3 run, median).
+  - **`eval/benchmarks/ethibench.md`:** prosedur EthiBench (108 GT: vuln-bank 60, paygoat 28, xben-090 20) — versi yang dipatok (vuln-bank `b1962823` + patch de-hinting, paygoat `69589b4`), angka acuan paper (Claude Code recall +18,83% vs Strix), aturan jujur.
+  - **`eval/ethibench-export.mjs`:** eksportir temuan → `findings.jsonl` EthiBench (`run_<n>/<target>/findings.jsonl`, field title/description/steps/cwe/severity/url) + 4 test baru.
+  - **`scripts/baseline-laptop.sh` (+ `npm run baseline:laptop`):** satu perintah di laptop — cek prasyarat (Docker, Strix, Node ≥ 24, Python, Poetry, pipx), lab lokal 3 run, lalu panduan XBEN + EthiBench. Keluar 2 bila prasyarat hilang (terverifikasi di VM: exit 2, Docker/Strix/Poetry/pipx tidak ada — bukan mock diam-diam).
+- **Batasan jujur v1.4.0:** baseline LIVE tetap belum pernah jalan — semua langkah live butuh laptop Fahmi (Docker + Strix + model). Pack ini hanya membuat baseline itu siap dijalankan, bukan menjalankannya.
+
 ## [1.3.2] — 2026-11-23
 
 ### Added

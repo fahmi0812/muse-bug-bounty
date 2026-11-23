@@ -1,6 +1,6 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.3.2 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.4.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
@@ -145,6 +145,8 @@ npm run measure-baseline  # LIVE: ukur baseline Strix vs bounty di lab Docker (b
 **v1.3 — perdalam + scale:** 7 runner baru (arjun, graphql-cop, gitleaks, trufflehog, osv-scanner, garak, deepteam) — `bounty scan` kini 10 tool; `bounty run --targets url1,url2` antrean multi-target dengan satu pool budget + peringatan biaya; `bounty view` membuka dashboard Strix; lab LLM nyata dipilih: LLMVault (MIT, 25 lab OWASP LLM Top 10 — endpoint/oracle belum diverifikasi live). 2 skill Tier 2 baru (lfi, nosqli) + 2 skill Trail of Bits.
 
 **v1.3.1 — 8 skill Tier 2 tertunda selesai** dengan parafrase defensif (fokus deteksi + validasi, minim payload mentah): `hunt-dom` (yang sempat kena flag — kini lolos), `hunt-nodejs`, `hunt-http-smuggling`, `hunt-jwt-crypto`, `hunt-llm-ai`, `hunt-api-misconfig`, `web2-recon`, `bug-bounty`. Index 57 entri; akurasi router llm-app naik 33% → 67% (mock).
+
+**v1.4 — baseline pack P0-1:** panduan XBEN (104 tantangan, subset 10 untuk sinyal awal) + EthiBench (108 GT, versi dipatok) di `eval/benchmarks/`, eksportir temuan → `findings.jsonl`, dan `scripts/baseline-laptop.sh` satu perintah di laptop. Baseline live-nya sendiri masih menunggu laptop — pack ini membuatnya siap jalan, bukan menjalankannya.
 
 **v1.3.2 — 2 skill terakhir selesai:** `hunt-mfa-bypass` (celah logika penegakan MFA; tebak/brute-force kode DILARANG) dan `hunt-host-header`. Index kini 59 entri — semua skill Tier 1 + Tier 2 lengkap, tidak ada lagi yang tertunda.
 
