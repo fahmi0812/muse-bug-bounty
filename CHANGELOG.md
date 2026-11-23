@@ -2,6 +2,13 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.12.1] — 2026-11-24
+
+### Fixed
+- **`bounty setup` — prompt API key dobel & "Mendeteksi model..." nempel.** Masking lama (hapus-baris per ketikan via keypress) berantakan di sebagian terminal: prompt tercetak dua kali dan pesan berikutnya menempel di baris yang sama. Diganti pendekatan bisukan-echo (`_writeToOutput`): prompt ditulis sekali, ketikan disembunyikan, diakhiri tepat satu newline. Nilai key tetap tidak tampil/dilog.
+- **`bounty setup` — daftar model membanjiri layar (254 baris).** Kini bila model > 40: ada loop filter ("ketik kata kunci untuk mempersempit") dan tampilan dibatasi 40 teratas dengan catatan "… dan N lagi". Pemilihan tetap bisa via nomor / id / sebagian nama (termasuk yang tak tampil).
+- **`bounty run` — pesan "Strix tidak ditemukan" lebih jelas.** Menyebut "di PATH" + petunjuk `source ~/.bashrc` / buka terminal baru bila Strix baru diinstal (installer menaruh PATH di `~/.bashrc`, shell berjalan belum memuatnya).
+
 ## [1.12.0] — 2026-11-23
 
 ### Added
