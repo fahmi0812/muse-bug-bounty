@@ -1,4 +1,4 @@
-// tests/integration-v19.test.js — v1.9.0: otak BugHunter (22 skill baru,
+// tests/integration-v19.test.js — v1.10.0: otak BugHunter (22 skill baru,
 // pola bersitasi 124, pendalaman Tier-1) + perintah `bounty skills`.
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +24,7 @@ function runCli(args, env = {}) {
   }
 }
 
-test("v1.9 CLI: bounty skills list 89 skill + sebutkan yang baru", () => {
+test("v1.10 CLI: bounty skills list 89 skill + sebutkan yang baru", () => {
   const r = runCli(["skills"]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /Total: 89 skill\./);
@@ -33,7 +33,7 @@ test("v1.9 CLI: bounty skills list 89 skill + sebutkan yang baru", () => {
   }
 });
 
-test("v1.9 CLI: bounty skills --skill tampilkan isi + skill tak dikenal exit 2", () => {
+test("v1.10 CLI: bounty skills --skill tampilkan isi + skill tak dikenal exit 2", () => {
   const r = runCli(["skills", "--skill", "hunt-grpc"]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /Scope & larangan/);
@@ -43,7 +43,7 @@ test("v1.9 CLI: bounty skills --skill tampilkan isi + skill tak dikenal exit 2",
   assert.match(bad.stderr, /Skill tidak ditemukan/);
 });
 
-test("v1.9 CLI: bounty patterns total 124, bersitasi 112", () => {
+test("v1.10 CLI: bounty patterns total 124, bersitasi 112", () => {
   const r = runCli(["patterns"]);
   assert.equal(r.status, 0, r.stderr);
   assert.match(r.stdout, /124 total, 112 bersitasi/);

@@ -1,10 +1,15 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.9.0 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.10.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
 > (Docker/Strix/provider/PowerShell) dan ditulis jujur di sana.
+
+> **v1.10.0 — planner coverage (2026-11-23):** `bounty/lib/planner.js` +
+> perintah baru `bounty plan` — peta surface × kelas vuln, rencana hunt
+> ke pasangan yang masih terbuka, surface terpanas dulu, max 3 kelas
+> per surface.
 
 > **v1.9.0 — otak BugHunter (2026-11-23):** 22 skill baru (index 67 → **89**),
 > pola bersitasi 85 → **124** (bersitasi 73 → **112**, 21 skill), 8 skill

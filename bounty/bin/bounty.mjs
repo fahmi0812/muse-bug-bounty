@@ -28,6 +28,7 @@ import { recordEpisode, listEpisodes, listLessons, addLesson, findSimilar, recor
 import { listNodes, listEdges, traceFinding } from "../lib/graph.js";
 import { routeWithLessons } from "../lib/router.js";
 import { loadPatterns, citedPatterns, patternEvidence } from "../lib/patterns.js";
+import { buildCoverageMap, planNext, recordSurface, coverageSummary } from "../lib/planner.js";
 import { runSubfinder, runDnsx, runHttpx, runKatana, runNucleiKev, updateNucleiTemplates, crtsh, RECON_TOOLS } from "../lib/recon.js";
 import { runJsluice, runSourcemapper } from "../lib/jsmining.js";
 import { startInteractsh, pollInteractsh, stopInteractsh } from "../lib/oast.js";
@@ -56,7 +57,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.9.0";
+export const VERSION = "1.10.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -163,6 +164,9 @@ MEMORI, GRAF & POLA
       Pustaka pola laporan: total, bersitasi, per skill (+ bonus router).
   bounty skills [--skill <nama>]
       Daftar skill hunt di skills-index.json; --skill tampilkan isi skill.
+  bounty plan --program <nama> [--limit N] [--record <surface>]
+      Rencana hunt berbasis coverage: surface terpanas dulu, max 3 kelas
+      per surface. --record daftarkan surface baru dari recon.
 
 GERBANG CI & BENCHMARK
   bounty promptfoo-gate --results <hasil.json> [--min-pass-rate 0.8]
@@ -1307,6 +1311,43 @@ function cmdSkills(args) {
   return 0;
 }
 
+function cmdPlan(args) {
+  const program = args.program ? String(args.program) : "";
+  if (!program) { console.error("Pakai: bounty plan --program <nama> [--limit N] [--record <surface>]"); return 2; }
+  const store = new Store();
+  try {
+    if (args.record) {
+      const n = recordSurface(store.db, program, String(args.record));
+      console.log(`Surface didaftarkan: ${args.record} (${n} baris coverage baru).`);
+    }
+    const sum = coverageSummary(store.db, program);
+    console.log(summaryBox([
+      `Coverage ${program}`,
+      `Surface: ${sum.surfaces} | Diperiksa: ${sum.examined} | Terbuka: ${sum.open} | Dikesampingkan: ${sum.ruledOut}`,
+      `Cakupan: ${sum.pct}%`,
+    ], { title: "Rencana hunt" }));
+    if (sum.surfaces === 0) {
+      console.log(`Belum ada surface untuk program ${program}.`);
+      console.log(`Daftarkan lewat: bounty plan --program ${program} --record <surface>`);
+      console.log(`atau jalankan dulu: bounty run --program programs/${program}.md`);
+      return 0;
+    }
+    const limit = Number(args.limit ?? 10);
+    const plan = planNext(store.db, program, { limit: Number.isFinite(limit) ? limit : 10 });
+    if (plan.length === 0) {
+      console.log("Semua pasangan (surface, kelas) sudah diperiksa/dikesampingkan. Tidak ada rencana baru.");
+      return 0;
+    }
+    const rows = plan.map((p) => [p.surface, p.vulnClass, p.reason]);
+    console.log(table(rows, ["Surface", "Kelas", "Alasan"]));
+    console.log(`Total: ${plan.length} pasangan (surface, kelas) — hunt yang belum tersentuh.`);
+    console.log(`Lanjut hunt: bounty scan --tool nuclei --target <surface> --program programs/${program}.md`);
+    return 0;
+  } finally {
+    store.close();
+  }
+}
+
 async function cmdBench(args) {
   // Per spec: bench memanggil lib/bench.js (runBench + scoreFindings).
   // Oracle dibaca dari eval/oracle/labels/*.json bila ada; runFn mock
@@ -1356,7 +1397,7 @@ function cmdInstall(args) {
 const COMMANDS = [
   "provider", "run", "view", "review", "programs", "findings", "memory",
   "graph", "trace", "report", "bench", "scan", "recon", "oast", "platform",
-  "patterns", "skills", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
+  "patterns", "skills", "plan", "dedup", "codesearch", "graphql", "cloud", "reverse", "caido",
   "firmware", "promptfoo-gate", "graph-gate", "install",
 ];
 
@@ -1409,6 +1450,7 @@ export async function main(argv = process.argv.slice(2)) {
     case "platform": return await cmdPlatform(args);
     case "patterns": return cmdPatterns(args);
     case "skills": return cmdSkills(args);
+    case "plan": return cmdPlan(args);
     case "dedup": return cmdDedup(args);
     case "codesearch": return cmdCodesearch(args);
     case "graphql": return await cmdGraphql(args);

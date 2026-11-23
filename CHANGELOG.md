@@ -2,6 +2,14 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.10.0] — 2026-11-23
+
+### Added
+- **v1.10 — planner berbasis coverage (ARTEX-style), tahap 2 dari "gas semuanya berurutan":**
+  - **`bounty/lib/planner.js` (baru, zero-dep):** `buildCoverageMap` (surface × kelas vuln, status examined/open/ruled_out — surface = union endpoint candidate + surface terdaftar), `planNext` (pasangan (surface, kelas) yang masih open; surface terpanas dulu, lalu kelas paling sering terkonfirmasi, lalu abjad; **noise governor max 3 kelas per surface**), `recordSurface` (daftarkan surface baru — tulis baris `open` hanya untuk kelas yang belum punya baris, tanpa menimpa examined/ruled_out), `coverageSummary` (surface, examined/open/ruled_out, pct). Universe = 72 kelas vuln dari skills-index (86 unik minus 14 skill meta/metodologi yang bukan kelas vuln — daftar pengecualian diekspor sebagai `EXCLUDED_META_CLASSES`). Ide diambil dari ARTEX (AGPL — hanya idenya, bukan kodenya). 9 test.
+  - **Perintah baru `bounty plan --program <nama> [--limit N] [--record <surface>]`: ** kotak ringkasan coverage + tabel rencana (Surface/Kelas/Alasan) + petunjuk lanjut hunt (`bounty scan ...`); program kosong → exit 0 + petunjuk daftar surface; tanpa --program → exit 2.
+- **Batasan jujur v1.10.0:** planner hanya membaca candidate + memory_coverage yang sudah ada — surface dari recon (subfinder/httpx/katana) belum otomatis didaftarkan (pakai `--record` dulu); planner tidak memilih target run otomatis (rencana dibaca manusia, baru dijalankan manual); baseline live + oracle LLMVault tetap menunggu laptop Fahmi. Lanjut: v1.11 ingatan.
+
 ## [1.9.0] — 2026-11-23
 
 ### Added
