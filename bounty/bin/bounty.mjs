@@ -59,7 +59,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.12.0";
+export const VERSION = "1.12.1";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -236,24 +236,21 @@ function ask(rl, q) {
   return new Promise((resolve) => rl.question(q, (a) => resolve(a.trim())));
 }
 
-// Prompt tanpa echo (untuk API key): tiap ketikan, bersihkan baris lalu
-// tulis ulang prompt saja, jadi nilai tidak pernah tampil di layar.
-// Hanya dipanggil di TTY; kalau apa pun gagal, jatuh balik ke ask biasa.
+// Prompt tanpa echo (untuk API key): tulis prompt SEKALI, bisukan semua
+// echo readline selama input, lalu akhiri dengan tepat satu newline. Nilai
+// tidak pernah tampil di layar maupun dilog. Hanya dipakai di TTY; bila
+// _writeToOutput tak tersedia, jatuh balik ke ask biasa.
 function askHidden(rl, q) {
   return new Promise((resolve) => {
-    try {
-      const output = rl.output;
-      output.write(q);
-      const onKeypress = () => { try { output.write(`\u001b[2K\u001b[200D${q}`); } catch {} };
-      rl.input.on("keypress", onKeypress);
-      rl.question("", (a) => {
-        rl.input.removeListener("keypress", onKeypress);
-        output.write("\n");
-        resolve(String(a).trim());
-      });
-    } catch {
-      rl.question(q, (a) => resolve(String(a).trim()));
-    }
+    const orig = typeof rl._writeToOutput === "function" ? rl._writeToOutput.bind(rl) : null;
+    if (!orig) { rl.question(q, (a) => resolve(String(a).trim())); return; }
+    rl.output.write(q);
+    rl._writeToOutput = () => {}; // bisukan echo ketikan (prompt sudah ditulis)
+    rl.question("", (a) => {
+      rl._writeToOutput = orig;
+      rl.output.write("\n");
+      resolve(String(a).trim());
+    });
   });
 }
 
@@ -357,14 +354,25 @@ async function stepProvider(rl, args) {
   try { detected = await detectModels({ type, baseUrl, apiKey }); }
   catch (e) { console.error(color(`  Gagal deteksi model: ${e.message}`, "red")); return { ok: false }; }
   if (detected.warning) console.log(color(`  Peringatan: ${detected.warning}`, "yellow"));
-  let models = detected.models;
-  if (rl && models.length > 12) {
-    const q = await ask(rl, `  ${models.length} model — ketik filter (Enter = tampil semua): `);
-    const filtered = filterModels(models, q);
-    if (filtered.length > 0) models = filtered;
+  const allModels = detected.models;
+  let models = allModels;
+  const PAGE = 40;
+  if (rl && models.length > PAGE) {
+    console.log(`  ${models.length} model tersedia — ketik kata kunci untuk mempersempit (mis. "opus", "sonnet", "gpt-6").`);
+    for (;;) {
+      const q = (await ask(rl, `  Filter (Enter = tampilkan ${PAGE} teratas): `)).trim();
+      if (!q) break;
+      const filtered = filterModels(allModels, q);
+      if (filtered.length === 0) { console.log(color(`  Tidak ada yang cocok dengan "${q}" — coba kata lain.`, "yellow")); continue; }
+      models = filtered;
+      if (models.length <= PAGE) break;
+      console.log(`  Masih ${models.length} model cocok — persempit lagi, atau Enter untuk ${PAGE} teratas.`);
+    }
   }
-  console.log(`  Model tersedia (${models.length}):`);
-  models.forEach((m, i) => console.log(`    ${color(String(i + 1), "cyan")}. ${m}`));
+  const shown = models.slice(0, PAGE);
+  console.log(`  Model (${models.length}${shown.length < models.length ? `, tampil ${shown.length} teratas` : ""}):`);
+  shown.forEach((m, i) => console.log(`    ${color(String(i + 1), "cyan")}. ${m}`));
+  if (shown.length < models.length) console.log(hint(`    … dan ${models.length - shown.length} lagi — ketik sebagian nama untuk memilih yang tak tampil.`));
   let picked = null;
   while (!picked) {
     const raw = args.model || (rl ? await ask(rl, "  Pilih model (nomor / id / sebagian nama): ") : "");
@@ -593,8 +601,9 @@ async function runSingleTarget(args, targetOverride = null) {
   // 3. Strix binary check
   const strix = findBinary("strix");
   if (!strix) {
-    console.log("Strix tidak ditemukan — jalankan mode --dry-run atau install Strix via curl resmi");
+    console.log("Strix tidak ditemukan di PATH — jalankan mode --dry-run atau install Strix via curl resmi");
     console.log("  Jalankan: bounty install --strix   (menampilkan perintah resmi, tanpa auto-run)");
+    console.log("  Baru menginstal Strix? Muat ulang PATH dulu: source ~/.bashrc (atau buka terminal baru).");
     if (args["dry-run"]) {
       console.log(`[dry-run] skills-dir: ${SKILLS_DIR} (akan diteruskan ke Strix via --skills-dir / STRIX_SKILLS_DIR)`);
       console.log("[dry-run] Instruksi yang akan dikirim ke Strix:");
