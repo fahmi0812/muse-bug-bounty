@@ -96,10 +96,12 @@ export function summaryBox(lines, opts = {}) {
   const all = opts.title !== undefined && opts.title !== null && opts.title !== ""
     ? [String(opts.title), ...body]
     : body;
-  const inner = Math.max(0, ...all.map((l) => l.length)) + 2;
+  // Lebar dari panjang TAMPAK supaya isi berwarna (kode ANSI) tidak
+  // menggeser garis tepi kanan kotak.
+  const inner = Math.max(0, ...all.map((l) => visibleLength(l))) + 2;
   const top = `┌${"─".repeat(inner)}┐`;
   const bottom = `└${"─".repeat(inner)}┘`;
-  const middle = all.map((l) => `│ ${l.padEnd(inner - 2)} │`);
+  const middle = all.map((l) => `│ ${l + " ".repeat(Math.max(0, inner - 2 - visibleLength(l)))} │`);
   return [top, ...middle, bottom].join("\n");
 }
 
@@ -108,6 +110,16 @@ export function phaseLine(phase, detail, opts = {}) {
   const p = String(phase ?? "");
   if (detail === undefined || detail === null || String(detail) === "") return `▸ ${p}`;
   return `▸ ${p}: ${detail}`;
+}
+
+/** Judul seksi (tebal) untuk wizard/ringkasan; warna mengikuti colorsEnabled. */
+export function heading(text, opts = {}) {
+  return color(String(text ?? ""), "bold", opts);
+}
+
+/** Teks petunjuk redup (mis. nilai default pada prompt). */
+export function hint(text, opts = {}) {
+  return color(String(text ?? ""), "dim", opts);
 }
 
 /** Format dolar 2 desimal, mis. 5 -> "$5.00"; bukan angka/NaN -> "$0.00". */
