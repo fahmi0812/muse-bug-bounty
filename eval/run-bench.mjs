@@ -183,11 +183,25 @@ export async function runBench({ runs = RUNS } = {}) {
     routerMs = med(times);
   }
 
+  // Akurasi router (plan v3.1 #7): untuk tiap lab, apakah top-5 skill
+  // yang di-route mengandung hunt-<kelas> yang sesuai dengan oracle.
+  // Hit rate, bukan latensi — latensi tidak membuktikan pilihan benar.
+  let routerAccuracy = null;
+  if (lib.bench?.routerAccuracy) {
+    routerAccuracy = {};
+    for (const l of labs) {
+      const oracle = JSON.parse(readFileSync(join(LABELS_DIR, `${l.lab}.json`), 'utf8'));
+      const acc = lib.bench.routerAccuracy(oracle.vulns ?? []);
+      routerAccuracy[l.lab] = { hit: acc.hit, total: acc.total, accuracy: acc.accuracy };
+    }
+  }
+
   const result = {
     generated_at: new Date().toISOString(),
     mode: hasDocker ? 'docker-present-mock' : 'no-docker',
     runs,
     router_ms_median: routerMs,
+    router_accuracy: routerAccuracy,
     labs,
     gate: 'FP median harus turun dan TP median tidak turun vs baseline Strix (lihat eval/README.md). Baseline diukur terpisah; file ini menyimpan hasil mock run.',
   };
@@ -219,6 +233,12 @@ export async function runBench({ runs = RUNS } = {}) {
     );
   }
   if (routerMs !== null) console.log(`\nrouter median: ${routerMs.toFixed(2)} ms`);
+  if (routerAccuracy) {
+    console.log('\nrouter accuracy (top-5 mengandung hunt-<kelas> oracle):');
+    for (const [lab, acc] of Object.entries(routerAccuracy)) {
+      console.log(`  ${lab.padEnd(12)}${acc.hit}/${acc.total} = ${(acc.accuracy * 100).toFixed(0)}%`);
+    }
+  }
   console.log(`\nHasil tersimpan: eval/results/latest.json`);
   return result;
 }

@@ -1,4 +1,6 @@
 // bounty/lib/bench.js — scoring + benchmark runner.
+import { routeSkills, loadSkillsIndex } from "./router.js";
+
 export function median(values) {
   const sorted = [...(values ?? [])].map(Number).filter(Number.isFinite).sort((a, b) => a - b);
   if (sorted.length === 0) return 0;
@@ -83,4 +85,84 @@ export async function runBench({ labs = [], runs = 3, runFn }) {
   return results;
 }
 
-export default { scoreFindings, median, runBench };
+// --- Akurasi router (plan v3.1 perbaikan #7) ---
+// Untuk tiap entri oracle, route top-5 skill dari konteks
+// "<vuln_class> <endpoint> <cwe>" lalu cek apakah skill hunt yang
+// sesuai ada di top-5. Skor = hit rate. Bukan latensi (ms) — latensi
+// tidak membuktikan router memilih skill yang benar.
+const CLASS_TO_SKILL = {
+  "sql injection": "hunt-sqli",
+  "cross-site scripting": "hunt-xss",
+  "reflected xss": "hunt-xss",
+  "stored xss": "hunt-xss",
+  "dom xss": "hunt-xss",
+  "server-side request forgery": "hunt-ssrf",
+  ssrf: "hunt-ssrf",
+  "insecure direct object reference": "hunt-idor",
+  idor: "hunt-idor",
+  "broken object level authorization": "hunt-api-bola",
+  bola: "hunt-api-bola",
+  "broken access control": "hunt-broken-access",
+  "authentication bypass": "hunt-auth-bypass",
+  "broken authentication": "hunt-auth-bypass",
+  jwt: "hunt-jwt",
+  "cross-site request forgery": "hunt-csrf",
+  csrf: "hunt-csrf",
+  "path traversal": "hunt-path-traversal",
+  "directory traversal": "hunt-path-traversal",
+  "open redirect": "hunt-open-redirect",
+  "unrestricted file upload": "hunt-file-upload",
+  "remote code execution": "hunt-rce",
+  "command injection": "hunt-rce",
+  "server-side template injection": "hunt-ssti",
+  ssti: "hunt-ssti",
+  "xml external entity": "hunt-xxe",
+  xxe: "hunt-xxe",
+  "insecure deserialization": "hunt-deserialization",
+  "prototype pollution": "hunt-prototype-pollution",
+  "race condition": "hunt-race-condition",
+  "graphql": "hunt-graphql",
+  "prompt injection": "hunt-llm-prompt-injection",
+  "exposed secrets": "hunt-secrets",
+  "business logic": "hunt-business-logic",
+};
+
+const GENERIC_WORDS = new Set(["broken", "missing", "weak", "sensitive", "unrestricted", "via", "the", "and", "or", "of", "in", "on", "a", "an", "data", "exposure"]);
+
+export function expectedSkillFor(vulnClass = "") {
+  const lower = String(vulnClass).toLowerCase().trim();
+  if (CLASS_TO_SKILL[lower]) return CLASS_TO_SKILL[lower];
+  // Kelas oracle sering majemuk: "<spesifik> / <umum>" (mis.
+  // "JWT / Broken Authentication"). Segmen pertama adalah yang paling
+  // spesifik — cek itu dulu, baru seluruh string.
+  const first = lower.split("/")[0].trim();
+  if (CLASS_TO_SKILL[first]) return CLASS_TO_SKILL[first];
+  for (const [key, skill] of Object.entries(CLASS_TO_SKILL)) {
+    if (first.includes(key)) return skill;
+  }
+  for (const [key, skill] of Object.entries(CLASS_TO_SKILL)) {
+    if (lower.includes(key)) return skill;
+  }
+  // Fallback: token khas pertama -> hunt-<token> (mis. "nosql injection" -> hunt-nosql).
+  const tokens = lower.split(/[^a-z0-9]+/).filter((t) => t.length > 2 && !GENERIC_WORDS.has(t));
+  return tokens.length ? `hunt-${tokens[0]}` : "triage-generic";
+}
+
+export function routerAccuracy(oracle = [], routeFn = null, skills = null) {
+  const router = routeFn ?? ((ctx) => routeSkills(ctx, skills ?? loadSkillsIndex()));
+  const perEntry = [];
+  let hit = 0;
+  for (const v of oracle ?? []) {
+    const vulnClass = String(v.vuln_class ?? v.vulnClass ?? "");
+    const context = `${vulnClass} ${v.endpoint ?? v.path ?? ""} ${v.cwe ?? ""}`.trim();
+    const selected = router(context).map((s) => String(s?.name ?? s).toLowerCase());
+    const expected = expectedSkillFor(vulnClass);
+    const isHit = selected.includes(expected);
+    if (isHit) hit += 1;
+    perEntry.push({ endpoint: v.endpoint ?? v.path ?? "", vuln_class: vulnClass, expected, selected, hit: isHit });
+  }
+  const total = perEntry.length;
+  return { hit, total, accuracy: total === 0 ? 0 : hit / total, perEntry };
+}
+
+export default { scoreFindings, median, runBench, routerAccuracy, expectedSkillFor };

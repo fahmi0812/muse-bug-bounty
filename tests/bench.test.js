@@ -4,7 +4,8 @@
 // median(values) -> median. runBench({labs, runs, runFn}) -> ringkasan per lab.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { scoreFindings, median, runBench } from '../bounty/lib/bench.js';
+import { scoreFindings, median, runBench, routerAccuracy, expectedSkillFor } from '../bounty/lib/bench.js';
+import { routeSkills } from '../bounty/lib/router.js';
 
 const ORACLE = [
   { endpoint: '/rest/user/login', method: 'POST', vuln_class: 'SQL Injection', cwe: 'CWE-89' },
@@ -93,4 +94,39 @@ test('bench: runBench lib jalan dengan runFn mock, median benar', async () => {
   assert.equal(results[0].median.fp, 0);
   assert.equal(results[0].median.fn, 0);
   assert.equal(results[0].median.recall, 1);
+});
+
+test('bench: expectedSkillFor memetakan kelas vuln ke hunt-<kelas>', () => {
+  assert.equal(expectedSkillFor('SQL Injection'), 'hunt-sqli');
+  assert.equal(expectedSkillFor('Reflected XSS'), 'hunt-xss');
+  assert.equal(expectedSkillFor('Stored XSS'), 'hunt-xss');
+  assert.equal(expectedSkillFor('IDOR / Broken Access Control'), 'hunt-idor');
+  assert.equal(expectedSkillFor('JWT / Broken Authentication'), 'hunt-jwt');
+  assert.equal(expectedSkillFor('Path Traversal'), 'hunt-path-traversal');
+  assert.equal(expectedSkillFor('CSRF / Missing Authorization'), 'hunt-csrf');
+  assert.equal(expectedSkillFor('GraphQL BOLA / Broken Object Level Authorization'), 'hunt-api-bola');
+});
+
+test('bench: routerAccuracy hit rate dengan router nyata + oracle Juice Shop', () => {
+  const acc = routerAccuracy(ORACLE);
+  assert.equal(acc.total, 3);
+  assert.ok(acc.hit >= 2, `diharapkan >= 2 hit, dapat ${acc.hit}: ${JSON.stringify(acc.perEntry)}`);
+  assert.ok(acc.accuracy >= 2 / 3);
+  for (const e of acc.perEntry) {
+    assert.equal(e.selected.length, 5, 'top-5 selalu 5 skill');
+    assert.equal(typeof e.hit, 'boolean');
+  }
+});
+
+test('bench: routerAccuracy dengan router palsu -> hit rate dihitung benar', () => {
+  const fakeRoute = (ctx) => {
+    if (ctx.toLowerCase().includes('sql')) return [{ name: 'hunt-sqli' }, { name: 'hunt-xss' }];
+    return [{ name: 'triage-generic' }];
+  };
+  const acc = routerAccuracy(ORACLE, fakeRoute);
+  assert.equal(acc.total, 3);
+  assert.equal(acc.hit, 1, 'hanya SQL Injection yang hit');
+  assert.ok(Math.abs(acc.accuracy - 1 / 3) < 1e-9);
+  assert.equal(routerAccuracy([]).accuracy, 0);
+  assert.equal(routerAccuracy([], fakeRoute).total, 0);
 });

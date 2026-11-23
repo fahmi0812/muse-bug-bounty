@@ -5,6 +5,8 @@
 // "candidate" (UNVERIFIED) sampai reviewer menyetujui di `bounty review`.
 // Biaya: dicari pola $X.XX / "cost: $X" / "total cost $X" di output.
 import { canonicalKey } from "./dedup.js";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 
 export const VULN_CLASSES = [
   ["sql injection", "SQL Injection", "CWE-89"],
@@ -151,4 +153,52 @@ export function parseStrixOutput(text = "", program = "") {
   return { findings: unique, usd: parseCost(text) };
 }
 
-export default { parseStrixOutput, parseCost, classifyVuln };
+// Artefak Strix (sumber utama, stdout hanya fallback): Strix menulis
+// strix_runs/<run>/run.json (status + usage/biaya) dan
+// vulnerabilities.json (+ findings.sarif). Cari direktori run terbaru yang
+// dibuat setelah run ini mulai; bila tidak ada, kembalikan kosong.
+export function readStrixArtifacts(cwd = process.cwd(), sinceMs = 0) {
+  const out = { usd: 0, findings: [] };
+  try {
+    const base = join(cwd, "strix_runs");
+    if (!existsSync(base)) return out;
+    const dirs = readdirSync(base, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => join(base, d.name))
+      .filter((p) => statSync(p).mtimeMs >= sinceMs - 1000)
+      .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+    if (dirs.length === 0) return out;
+    const dir = dirs[0];
+    const runJson = join(dir, "run.json");
+    if (existsSync(runJson)) {
+      try {
+        const run = JSON.parse(readFileSync(runJson, "utf8"));
+        const usd = run?.usage?.total_cost_usd ?? run?.total_cost_usd ?? run?.cost ?? run?.usage?.cost ?? 0;
+        if (Number(usd) > 0) out.usd = Number(usd);
+      } catch {}
+    }
+    const vulnJson = join(dir, "vulnerabilities.json");
+    if (existsSync(vulnJson)) {
+      try {
+        const list = JSON.parse(readFileSync(vulnJson, "utf8"));
+        const arr = Array.isArray(list) ? list : list?.vulnerabilities ?? list?.findings ?? [];
+        for (const v of arr) {
+          const title = v?.title ?? v?.vuln_class ?? v?.type ?? v?.name ?? "";
+          const classified = classifyVuln(title);
+          out.findings.push({
+            endpoint: v?.url ?? v?.endpoint ?? v?.target ?? "",
+            method: v?.method ?? "GET",
+            param: v?.param ?? v?.parameter ?? "",
+            vulnClass: v?.vuln_class ?? classified?.vulnClass ?? title ?? "Unclassified Finding",
+            cwe: v?.cwe ?? classified?.cwe ?? "",
+            severity: (v?.severity ?? "medium").toLowerCase(),
+            evidence: (v?.evidence ?? v?.description ?? "").slice(0, 500),
+          });
+        }
+      } catch {}
+    }
+  } catch {}
+  return out;
+}
+
+export default { parseStrixOutput, parseCost, classifyVuln, readStrixArtifacts };

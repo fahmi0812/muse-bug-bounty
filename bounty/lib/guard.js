@@ -14,6 +14,39 @@ const BLOCKED_PATTERNS = [
   { re: /:\s*\(\s*\)\s*\{/, reason: "fork bomb diblokir" },
 ];
 
+// Denylist tool kategori K/L (abuse / bypass-aktivasi) — dilarang untuk bounty.
+// Nama repo/tool dari PDF kategori K/L; diblokir di kode, bukan cuma di docs.
+export const KL_DENYLIST = [
+  { name: "sms-bomber", re: /sms[-_ ]?bomber/i, reason: "tool SMS bomber (kategori K) diblokir" },
+  { name: "otp-bomber", re: /otp[-_ ]?bomber/i, reason: "tool OTP bomber (kategori K) diblokir" },
+  { name: "bomber", re: /\bbomber\b/i, reason: "tool bomber (kategori K) diblokir" },
+  { name: "sms-spam", re: /sms[-_ ]?spam/i, reason: "tool SMS spam (kategori K) diblokir" },
+  { name: "otp-spam", re: /otp[-_ ]?spam/i, reason: "tool OTP spam (kategori K) diblokir" },
+  { name: "jailbreak", re: /jailbreak/i, reason: "tool jailbreak (kategori K) diblokir" },
+  { name: "hackingtool", re: /hackingtool/i, reason: "tool hackingtool (kategori K) diblokir" },
+  { name: "aktivator", re: /\b(aktivator|activator)\b/i, reason: "tool aktivator/bypass lisensi (kategori L) diblokir" },
+  { name: "captcha-solver", re: /captcha[-_ ]?(solver|solving|bypass)/i, reason: "captcha solver/bypass (kategori L) diblokir" },
+];
+
+// Pola bypass red-team: perintah destruktif yang disembunyikan lewat
+// encoding, substitusi, atau chaining. Guard harus gagalkan semuanya.
+const BYPASS_PATTERNS = [
+  { re: /\bbase64\s+(?:-d|--decode)\b/i, reason: "decode base64 diblokir (jalur bypass)" },
+  { re: /\beval\s+\S/i, reason: "eval diblokir (jalur bypass)" },
+  { re: /\$\(\s*(?:rm|curl|wget|chmod|dd)\b/i, reason: "substitusi perintah destruktif diblokir" },
+  { re: /`[^`]*\b(?:rm|chmod|dd)\b[^`]*`/i, reason: "backtick perintah destruktif diblokir" },
+  { re: /\brm\$\{IFS\}/i, reason: "rm dengan IFS trick diblokir" },
+  { re: /\bfind\s+\S+\s+.*-exec\s+rm\b/i, reason: "find -exec rm diblokir" },
+  { re: /\bxargs\s+rm\b/i, reason: "xargs rm diblokir" },
+  { re: /\bsh\s+-c\b/i, reason: "sh -c diblokir (jalur bypass)" },
+  { re: /\|\s*(?:python3?|perl|ruby|node)\b/i, reason: "pipe ke interpreter diblokir" },
+  { re: /\bpython3?\s+-c\b[^&;]*\b(?:rm|os\.system|subprocess)\b/i, reason: "python -c destruktif diblokir" },
+  { re: /\bcurl\b[^|]*\|\s*base64/i, reason: "curl | base64 diblokir (jalur bypass)" },
+  { re: /;\s*(?:rm|chmod|dd|git\s+push)\b/i, reason: "chaining ke perintah terlarang diblokir" },
+  { re: /&&\s*(?:rm|chmod|dd|git\s+push)\b/i, reason: "chaining ke perintah terlarang diblokir" },
+  { re: /\|\|\s*(?:rm|chmod|dd|git\s+push)\b/i, reason: "chaining ke perintah terlarang diblokir" },
+];
+
 const SECRET_FILE_PATTERNS = [
   /\.env(\.|$|\s|["'])/i,
   /\.pem\b/i,
@@ -73,6 +106,12 @@ export function checkCommand(cmd, workspace = process.cwd()) {
   for (const { re, reason } of BLOCKED_PATTERNS) {
     if (re.test(command)) return { allowed: false, reason };
   }
+  for (const { re, reason } of BYPASS_PATTERNS) {
+    if (re.test(command)) return { allowed: false, reason };
+  }
+  for (const { re, reason } of KL_DENYLIST) {
+    if (re.test(command)) return { allowed: false, reason };
+  }
   for (const re of SECRET_FILE_PATTERNS) {
     if (re.test(command)) return { allowed: false, reason: "akses file rahasia diblokir (.env/.pem/.key/id_rsa/credentials/.aws/.ssh)" };
   }
@@ -100,4 +139,4 @@ export function redact(text) {
   return out;
 }
 
-export default { checkCommand, scanSecrets, redact };
+export default { checkCommand, scanSecrets, redact, KL_DENYLIST };

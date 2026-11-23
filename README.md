@@ -1,6 +1,6 @@
 # muse-bug-bounty
 
-> **Status: produksi v1.0.0 (2026-11-23).** Wrapper, skill, eval harness,
+> **Status: produksi v1.1.0 (2026-11-23).** Wrapper, skill, eval harness,
 > docs P2, dan dokumen tim sudah lengkap (`docs/TEAM.md`,
 > `CONTRIBUTING.md`, `SECURITY.md`, `CHANGELOG.md`). Lihat
 > [Batasan live](#batasan-live) — beberapa jalur belum diuji live
@@ -136,7 +136,9 @@ npm run bench             # eval/run-bench.mjs — mock (deterministik) + gate b
 npm run measure-baseline  # LIVE: ukur baseline Strix vs bounty di lab Docker (butuh Docker + Strix, di laptop)
 ```
 
-`bounty run` sekarang meneruskan skill ke Strix (`--skills-dir` + `STRIX_SKILLS_DIR`), lalu mem-parse output Strix (JSON / JSONL / Markdown) menjadi kandidat di `bounty.db` — semua berstatus `candidate` (UNVERIFIED) sampai disetujui di `bounty review`. Biaya terukur dari output (`Total cost: $X`) dicatat di tabel `run`.
+`bounty run` sekarang meneruskan skill ke Strix (`--skills-dir` + `STRIX_SKILLS_DIR`), lalu mem-parse output Strix (JSON / JSONL / Markdown) menjadi kandidat di `bounty.db` — semua berstatus `candidate` (UNVERIFIED) sampai disetujui di `bounty review`. Biaya terukur dari output (`Total cost: $X`) dicatat di tabel `run`. **v1.1:** sumber utama temuan/biaya adalah artefak Strix `strix_runs/<run>/run.json` + `vulnerabilities.json` (stdout hanya fallback); Strix exit 2 = "vulns found" dipetakan ke sukses-dengan-temuan (bukan error); `STRIX_TELEMETRY=0` disetel saat spawn.
+
+**v1.1 — runner on-demand:** `bounty scan --tool nuclei|dalfox|ffuf --target URL --program programs/<nama>.md` menjalankan tool itu (bila terinstal; bila tidak ada, dilewati tanpa error) dan menyimpan temuannya sebagai kandidat. Bench kini juga mengukur **akurasi router** (top-5 skill vs oracle per lab; mock saat ini: dvga 100%, dvwa 88%, juice-shop 70%, vampi 63%, llm-app 33%).
 
 Bench menjalankan tiap lab 3× (mock findings deterministik, seed tetap),
 menghitung TP/FP/FN/precision/recall per run dan median lintas run,

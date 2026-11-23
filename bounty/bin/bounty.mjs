@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
-// Commands: provider | run | review | report | bench | install | programs | findings | --help | --version
+// Commands: provider | run | review | report | bench | install | programs | findings | scan | --help | --version
 import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -15,8 +15,9 @@ import { TokenBucket } from "../lib/rate.js";
 import { getRoleProfile, buildInstruction } from "../lib/auth.js";
 import { detectModels, saveProvider, writeStrixConfig, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
-import { parseStrixOutput } from "../lib/strix-output.js";
+import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates } from "../lib/dedup.js";
+import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
 import { fileURLToPath } from "node:url";
 
 export const VERSION = "0.1.0";
@@ -49,6 +50,10 @@ Penggunaan:
       Render laporan temuan ke stdout (atau file).
   bounty bench [--lab NAME] [--runs N]
       Jalankan benchmark (eval/run-bench.mjs bila ada, fallback mock).
+  bounty scan --tool nuclei|dalfox|ffuf --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N]
+      Jalankan satu scanner klasik on-demand dalam scope program.
+      Binary tidak ada -> dilewati (bukan error). Hasil = kandidat
+      (UNVERIFIED) di store; review dulu di 'bounty review'.
   bounty install [--strix]
       Cek/instal Strix via curl resmi (hanya tampilkan perintah, tidak auto-run pipe-to-shell).
   bounty --help | bounty --version
@@ -212,7 +217,8 @@ async function cmdRun(args) {
   const startedAt = Date.now();
   const res = spawnSync(strix, [...strixArgs, "--instruction", instruction], {
     encoding: "utf8",
-    env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}) },
+    // Privasi tim: telemetri Strix dimatikan (default Strix = 1).
+    env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), STRIX_TELEMETRY: "0" },
   });
   if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return done(2, "error"); }
   const stdout = String(res.stdout ?? "");
@@ -223,11 +229,20 @@ async function cmdRun(args) {
   // 6. Parse output Strix -> store (run -> store -> review).
   //    Semua temuan masuk sebagai "candidate" (UNVERIFIED) — reviewer
   //    yang memutuskan di `bounty review`. Dedup dulu vs store + internal.
+  //    Exit code Strix: 2 = "vulns found" (bukan error) -> sukses dengan
+  //    temuan; sumber utama temuan/biaya adalah artefak strix_runs/
+  //    (run.json + vulnerabilities.json), stdout hanya fallback.
   const code = res.status ?? 0;
+  const strixOk = code === 0 || code === 2;
+  if (code === 2) console.log("\nStrix exit 2 = temuan ditemukan (bukan error).");
   try {
     const store = new Store();
     try {
-      const { findings, usd } = parseStrixOutput(stdout + "\n" + stderr, program.name);
+      const parsed = parseStrixOutput(stdout + "\n" + stderr, program.name);
+      const artifacts = readStrixArtifacts(process.cwd(), startedAt);
+      const findings = [...parsed.findings, ...artifacts.findings.map((f) => ({ ...f, program: program.name }))];
+      const usd = artifacts.usd > 0 ? artifacts.usd : parsed.usd;
+      if (artifacts.findings.length > 0) console.log(`Artefak Strix: ${artifacts.findings.length} temuan dari strix_runs/vulnerabilities.json${artifacts.usd > 0 ? `, biaya $${artifacts.usd} dari run.json` : ""}.`);
       const existing = store.listCandidates(program.name, "candidate")
         .map((c) => ({ endpoint: c.endpoint, method: c.method, param: c.param, vuln_class: c.vuln_class, cwe: c.cwe }));
       const { unique } = dedupCandidates([...existing, ...findings]);
@@ -242,7 +257,7 @@ async function cmdRun(args) {
       console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
     } finally { store.close(); }
   } catch (e) { console.error(`Peringatan: gagal menyimpan hasil ke store: ${e.message}`); }
-  return done(code, code === 0 ? "ok" : "failed");
+  return done(strixOk ? 0 : code, strixOk ? (code === 2 ? "ok-findings" : "ok") : "failed");
 }
 
 function cmdReview(args) {
@@ -365,6 +380,66 @@ function cmdReport(args) {
   }
 }
 
+async function cmdScan(args) {
+  const tool = String(args.tool ?? "").toLowerCase();
+  const target = args.target;
+  const programPath = args.program || resolve(process.cwd(), "programs/example.md");
+  if (!SUPPORTED_TOOLS.includes(tool)) {
+    console.error(`--tool wajib: ${SUPPORTED_TOOLS.join(" | ")} (dapat: "${tool || ""}")`);
+    return 2;
+  }
+  if (!existsSync(programPath)) {
+    console.error(`Program tidak ditemukan: ${programPath}`);
+    console.error("Buat programs/<nama>.md dulu (Scope/Allowed/Denied/Budget/Rate/Roles).");
+    return 2;
+  }
+  if (!target) {
+    console.error("--target URL wajib.");
+    return 2;
+  }
+  const program = loadProgramFile(programPath);
+  const scope = checkScope(program, target);
+  console.log(scope.ok ? "Scope OK" : `Scope DITOLAK: ${scope.reason}`);
+  if (!scope.ok) {
+    try { logAudit({ command: "scan", tool, target, program: program.name, result: "blocked" }); } catch {}
+    return 2;
+  }
+  try { logAudit({ command: "scan", tool, target, program: program.name, result: "started" }); } catch {}
+  const result = runTool(tool, {
+    target,
+    program,
+    timeoutMs: Number(args["timeout-ms"] ?? 120000),
+    wordlist: args.wordlist,
+  });
+  if (result.error) {
+    console.error(result.error);
+    try { logAudit({ command: "scan", tool, target, program: program.name, result: "error" }); } catch {}
+    return 2;
+  }
+  if (result.skipped) {
+    console.log(`Dilewati: ${result.reason}`);
+    try { logAudit({ command: "scan", tool, target, program: program.name, result: "skipped" }); } catch {}
+    return 0;
+  }
+  // Simpan kandidat ke store (dedup vs yang sudah ada di program ini).
+  const store = new Store();
+  try {
+    const existing = store.listCandidates(program.name, "candidate")
+      .map((c) => ({ endpoint: c.endpoint, method: c.method, param: c.param, vuln_class: c.vuln_class, cwe: c.cwe }));
+    const { unique } = dedupCandidates([...existing, ...result.findings]);
+    const fresh = unique.slice(existing.length);
+    let added = 0;
+    for (const f of fresh) {
+      store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
+      added++;
+    }
+    console.log(`[${tool}] ${result.rawCount} temuan mentah, ${added} kandidat baru masuk store (dedup: ${result.findings.length - added} duplikat) dalam ${result.time_ms} ms.`);
+    console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
+  } finally { store.close(); }
+  try { logAudit({ command: "scan", tool, target, program: program.name, result: "ok" }); } catch {}
+  return 0;
+}
+
 async function cmdBench(args) {
   // Per spec: bench memanggil lib/bench.js (runBench + scoreFindings).
   // Oracle dibaca dari eval/oracle/labels/*.json bila ada; runFn mock
@@ -430,6 +505,7 @@ export async function main(argv = process.argv.slice(2)) {
     case "findings": return cmdFindings(args);
     case "report": return cmdReport(args);
     case "bench": return await cmdBench(args);
+    case "scan": return await cmdScan(args);
     case "install": return cmdInstall(args);
     default:
       console.error(`Perintah tidak dikenal: ${cmd}\n`);

@@ -1,536 +1,648 @@
 [
-  {
-    "cwe": "CWE-707",
-    "file": "hunt/triage-generic.md",
-    "keywords": [
-      "triage",
-      "validasi awal",
-      "reproduksi",
-      "false positive"
-    ],
-    "name": "triage-generic",
-    "vuln_class": "Triage",
-    "when": "Langkah pertama menilai kandidat temuan sebelum hunt mendalam."
-  },
-  {
-    "cwe": "CWE-89",
-    "file": "hunt/hunt-sqli.md",
-    "keywords": [
-      "sql",
-      "injection",
-      "database",
-      "query",
-      "parameter"
-    ],
-    "name": "hunt-sqli",
-    "vuln_class": "SQL Injection",
-    "when": "Input user sampai ke query database tanpa sanitasi."
-  },
-  {
-    "cwe": "CWE-79",
-    "file": "hunt/hunt-xss.md",
-    "keywords": [
-      "xss",
-      "script",
-      "reflected",
-      "stored",
-      "dom",
-      "html"
-    ],
-    "name": "hunt-xss",
-    "vuln_class": "Cross-Site Scripting",
-    "when": "Input user dirender sebagai HTML/JS di browser korban."
-  },
-  {
-    "cwe": "CWE-918",
-    "file": "hunt/hunt-ssrf.md",
-    "keywords": [
-      "ssrf",
-      "url fetch",
-      "webhook",
-      "metadata",
-      "internal"
-    ],
-    "name": "hunt-ssrf",
-    "vuln_class": "Server-Side Request Forgery",
-    "when": "Server mengambil URL yang dikendalikan user."
-  },
-  {
-    "cwe": "CWE-639",
-    "file": "hunt/hunt-idor.md",
-    "keywords": [
-      "idor",
-      "object id",
-      "user id",
-      "parameter",
-      "akses objek"
-    ],
-    "name": "hunt-idor",
-    "vuln_class": "Insecure Direct Object Reference",
-    "when": "ID objek di URL/body bisa ditebak dan diakses akun lain."
-  },
-  {
-    "cwe": "CWE-287",
-    "file": "hunt/hunt-auth-bypass.md",
-    "keywords": [
-      "auth",
-      "login",
-      "bypass",
-      "otp",
-      "password reset",
-      "session"
-    ],
-    "name": "hunt-auth-bypass",
-    "vuln_class": "Authentication Bypass",
-    "when": "Login, OTP, atau reset password bisa dilewati tanpa kredensial benar."
-  },
-  {
-    "cwe": "CWE-284",
-    "file": "hunt/hunt-broken-access.md",
-    "keywords": [
-      "access control",
-      "role",
-      "admin",
-      "privilege",
-      "authorization"
-    ],
-    "name": "hunt-broken-access",
-    "vuln_class": "Broken Access Control",
-    "when": "User biasa bisa memakai fungsi atau data role yang lebih tinggi."
-  },
-  {
-    "cwe": "CWE-352",
-    "file": "hunt/hunt-csrf.md",
-    "keywords": [
-      "csrf",
-      "token",
-      "state-changing",
-      "form",
-      "cookie"
-    ],
-    "name": "hunt-csrf",
-    "vuln_class": "Cross-Site Request Forgery",
-    "when": "Aksi sensitif tanpa token anti-CSRF atau tanpa cek origin."
-  },
-  {
-    "cwe": "CWE-611",
-    "file": "hunt/hunt-xxe.md",
-    "keywords": [
-      "xxe",
-      "xml",
-      "parser",
-      "entity",
-      "upload xml"
-    ],
-    "name": "hunt-xxe",
-    "vuln_class": "XML External Entity",
-    "when": "Aplikasi mem-parse XML dari user dengan external entity aktif."
-  },
-  {
-    "cwe": "CWE-94",
-    "file": "hunt/hunt-ssti.md",
-    "keywords": [
-      "ssti",
-      "template",
-      "jinja",
-      "render",
-      "expression"
-    ],
-    "name": "hunt-ssti",
-    "vuln_class": "Server-Side Template Injection",
-    "when": "Input user masuk ke template engine server."
-  },
-  {
-    "cwe": "CWE-94",
-    "file": "hunt/hunt-rce.md",
-    "keywords": [
-      "rce",
-      "command injection",
-      "exec",
-      "shell",
-      "code execution"
-    ],
-    "name": "hunt-rce",
-    "vuln_class": "Remote Code Execution",
-    "when": "Input user sampai ke eksekusi perintah atau kode di server."
-  },
-  {
-    "cwe": "CWE-22",
-    "file": "hunt/hunt-path-traversal.md",
-    "keywords": [
-      "path traversal",
-      "directory",
-      "file path",
-      "download",
-      "../"
-    ],
-    "name": "hunt-path-traversal",
-    "vuln_class": "Path Traversal",
-    "when": "Parameter nama file/path dikendalikan user tanpa normalisasi."
-  },
-  {
-    "cwe": "CWE-601",
-    "file": "hunt/hunt-open-redirect.md",
-    "keywords": [
-      "redirect",
-      "open redirect",
-      "next",
-      "return url",
-      "phishing"
-    ],
-    "name": "hunt-open-redirect",
-    "vuln_class": "Open Redirect",
-    "when": "Parameter URL redirect tidak divalidasi ke domain sendiri."
-  },
-  {
-    "cwe": "CWE-434",
-    "file": "hunt/hunt-file-upload.md",
-    "keywords": [
-      "upload",
-      "file",
-      "extension",
-      "mime",
-      "avatar"
-    ],
-    "name": "hunt-file-upload",
-    "vuln_class": "Unrestricted File Upload",
-    "when": "Upload file tanpa cek tipe, ekstensi, atau isi yang ketat."
-  },
-  {
-    "cwe": "CWE-347",
-    "file": "hunt/hunt-jwt.md",
-    "keywords": [
-      "jwt",
-      "token",
-      "algorithm",
-      "none",
-      "secret"
-    ],
-    "name": "hunt-jwt",
-    "vuln_class": "JWT Weakness",
-    "when": "Token JWT dipakai untuk auth dan bisa dimanipulasi."
-  },
-  {
-    "cwe": "CWE-400",
-    "file": "hunt/hunt-graphql.md",
-    "keywords": [
-      "graphql",
-      "query",
-      "introspection",
-      "mutation",
-      "schema"
-    ],
-    "name": "hunt-graphql",
-    "vuln_class": "GraphQL Abuse",
-    "when": "Endpoint GraphQL terbuka dengan introspection atau query dalam."
-  },
-  {
-    "cwe": "CWE-639",
-    "file": "hunt/hunt-api-bola.md",
-    "keywords": [
-      "bola",
-      "api",
-      "object level",
-      "rest",
-      "endpoint"
-    ],
-    "name": "hunt-api-bola",
-    "vuln_class": "Broken Object Level Authorization (API)",
-    "when": "API REST mengembalikan/mengubah objek milik user lain."
-  },
-  {
-    "cwe": "CWE-840",
-    "file": "hunt/hunt-business-logic.md",
-    "keywords": [
-      "business logic",
-      "harga",
-      "kuantitas",
-      "workflow",
-      "diskon",
-      "limit"
-    ],
-    "name": "hunt-business-logic",
-    "vuln_class": "Business Logic Flaw",
-    "when": "Alur bisnis (harga, kuota, status) bisa dimanipulasi lewat urutan atau nilai."
-  },
-  {
-    "cwe": "CWE-798",
-    "file": "hunt/hunt-secrets.md",
-    "keywords": [
-      "secret",
-      "api key",
-      "credential",
-      "hardcoded",
-      "bundle",
-      "source"
-    ],
-    "name": "hunt-secrets",
-    "vuln_class": "Exposed Secrets",
-    "when": "Kunci atau kredensial bocor di kode, bundle JS, atau respons."
-  },
-  {
-    "cwe": "CWE-200",
-    "file": "hunt/hunt-js-bundle.md",
-    "keywords": [
-      "javascript",
-      "bundle",
-      "source map",
-      "endpoint",
-      "frontend"
-    ],
-    "name": "hunt-js-bundle",
-    "vuln_class": "JS Bundle Exposure",
-    "when": "Bundle JS mengungkap endpoint, logika, atau secret (lihat js-bundle-analysis)."
-  },
-  {
-    "cwe": "CWE-362",
-    "file": "hunt/hunt-race-condition.md",
-    "keywords": [
-      "race",
-      "concurrent",
-      "double spend",
-      "redeem",
-      "coupon"
-    ],
-    "name": "hunt-race-condition",
-    "vuln_class": "Race Condition",
-    "when": "Aksi sekali-pakai bisa dipanggil paralel dan lolos dua kali."
-  },
-  {
-    "cwe": "CWE-502",
-    "file": "hunt/hunt-deserialization.md",
-    "keywords": [
-      "deserialization",
-      "serialize",
-      "pickle",
-      "object",
-      "cookie"
-    ],
-    "name": "hunt-deserialization",
-    "vuln_class": "Insecure Deserialization",
-    "when": "Data serial dari user di-deserialisasi tanpa verifikasi."
-  },
-  {
-    "cwe": "CWE-1321",
-    "file": "hunt/hunt-prototype-pollution.md",
-    "keywords": [
-      "prototype",
-      "pollution",
-      "merge",
-      "__proto__",
-      "javascript"
-    ],
-    "name": "hunt-prototype-pollution",
-    "vuln_class": "Prototype Pollution",
-    "when": "Merge objek JS dari user bisa menulis ke Object.prototype."
-  },
-  {
-    "cwe": "CWE-94",
-    "file": "hunt/hunt-llm-prompt-injection.md",
-    "keywords": [
-      "llm",
-      "prompt injection",
-      "ai",
-      "chatbot",
-      "instruction"
-    ],
-    "name": "hunt-llm-prompt-injection",
-    "vuln_class": "LLM Prompt Injection",
-    "when": "Input user sampai ke prompt LLM dan mengubah instruksinya."
-  },
-  {
-    "cwe": "CWE-707",
-    "file": "bb-methodology.md",
-    "keywords": [
-      "metodologi",
-      "fase",
-      "recon",
-      "threat model",
-      "gate"
-    ],
-    "name": "bb-methodology",
-    "vuln_class": "Methodology",
-    "when": "Butuh alur kerja hunt yang tertib dari recon sampai laporan."
-  },
-  {
-    "cwe": "CWE-707",
-    "file": "report-writing.md",
-    "keywords": [
-      "laporan",
-      "report",
-      "cvss",
-      "severity",
-      "template"
-    ],
-    "name": "report-writing",
-    "vuln_class": "Reporting",
-    "when": "Menulis laporan temuan untuk platform bounty."
-  },
-  {
-    "cwe": "CWE-200",
-    "file": "evidence-hygiene.md",
-    "keywords": [
-      "bukti",
-      "redaksi",
-      "pii",
-      "cookie",
-      "screenshot",
-      "har"
-    ],
-    "name": "evidence-hygiene",
-    "vuln_class": "Evidence Hygiene",
-    "when": "Membersihkan bukti sebelum disimpan atau dilampirkan."
-  },
-  {
-    "cwe": "CWE-707",
-    "file": "triage-validation.md",
-    "keywords": [
-      "triage",
-      "verdict",
-      "confirmed",
-      "rejected",
-      "needs validation"
-    ],
-    "name": "triage-validation",
-    "vuln_class": "Triage",
-    "when": "Menentukan verdict akhir sebuah kandidat temuan."
-  },
-  {
-    "cwe": "CWE-707",
-    "file": "verify-adversarial.md",
-    "keywords": [
-      "verifikasi",
-      "adversarial",
-      "replay",
-      "bantah",
-      "unverified"
-    ],
-    "name": "verify-adversarial",
-    "vuln_class": "Verification",
-    "when": "Menguji kandidat dengan cara membantahnya, bukan membenarkannya."
-  },
-  {
-    "cwe": "CWE-200",
-    "file": "js-bundle-analysis.md",
-    "keywords": [
-      "bundle",
-      "source map",
-      "javascript",
-      "endpoint",
-      "secret"
-    ],
-    "name": "js-bundle-analysis",
-    "vuln_class": "JS Bundle Analysis",
-    "when": "Menganalisis bundle JS untuk endpoint dan secret tersembunyi."
-  },
-  {
-    "name": "vbsec-21",
-    "file": "vbsec-21.md",
-    "vuln_class": "AI Code Vulnerabilities (21 types)",
-    "cwe": "CWE-707",
-    "keywords": [
-      "vbsec",
-      "ai code",
-      "slopsquatting",
-      "checklist",
-      "21 tipe"
-    ],
-    "when": "Pre-scan ringan kode hasil AI sebelum hunting dalam; cari 21 pola vuln termasuk slopsquatting."
-  },
-  {
-    "name": "ghost-loop",
-    "file": "ghost-loop.md",
-    "vuln_class": "Ghostsecurity Loop",
-    "cwe": "CWE-798",
-    "keywords": [
-      "ghostsecurity",
-      "poltergeist",
-      "wraith",
-      "reaper",
-      "exorcist",
-      "secret",
-      "dependency",
-      "osv"
-    ],
-    "when": "Audit repo: cari secret, dependensi rentan, dan pola kode AI dalam satu loop tertib."
-  },
-  {
-    "name": "trailofbits",
-    "file": "trailofbits.md",
-    "vuln_class": "Audit Review",
-    "cwe": "CWE-707",
-    "keywords": [
-      "trail of bits",
-      "fp-check",
-      "cvss",
-      "variant analysis",
-      "semgrep",
-      "fix review",
-      "supply chain"
-    ],
-    "when": "Audit mendalam / review temuan sebelum laporan: skor CVSS v4.0, filter false positive, review perbaikan."
-  },
-  {
-    "name": "review-pr",
-    "file": "review-pr.md",
-    "vuln_class": "PR Security Review",
-    "cwe": "CWE-707",
-    "keywords": [
-      "review pr",
-      "diff-aware",
-      "pull request",
-      "inline comment",
-      "false positive",
-      "github action"
-    ],
-    "when": "Ada PR/diff kode baru yang perlu direview keamanannya sebelum merge."
-  },
-  {
-    "name": "mindmap",
-    "file": "mindmap.md",
-    "vuln_class": "Navigation",
-    "cwe": "CWE-707",
-    "keywords": [
-      "mindmap",
-      "navigasi",
-      "recon",
-      "enumerasi",
-      "scanning",
-      "proxy",
-      "exploit",
-      "peta"
-    ],
-    "when": "Butuh peta jalan hunt dari recon sampai exploit dan skill mana di tiap tahap."
-  },
-  {
-    "name": "shannon-tracing",
-    "file": "shannon-tracing.md",
-    "vuln_class": "White-box Tracing",
-    "cwe": "CWE-707",
-    "keywords": [
-      "shannon",
-      "tracing",
-      "source",
-      "hipotesis",
-      "exploit live",
-      "no exploit no report",
-      "2fa"
-    ],
-    "when": "Target white-box: lacak source ke sink, buat hipotesis, buktikan dengan exploit live terkontrol."
-  },
-  {
-    "name": "sql-wordlist",
-    "file": "sql-wordlist.md",
-    "vuln_class": "SQL Injection Wordlist",
-    "cwe": "CWE-89",
-    "keywords": [
-      "sql",
-      "wordlist",
-      "payload",
-      "sqli",
-      "fuzzing",
-      "curated"
-    ],
-    "when": "Fuzzing parameter yang dicurigai SQLi dengan payload terkurasi (digabung payload hunt/ffuf/sqlmap)."
-  }
+ {
+  "cwe": "CWE-707",
+  "file": "hunt/triage-generic.md",
+  "keywords": [
+   "triage",
+   "validasi awal",
+   "reproduksi",
+   "false positive"
+  ],
+  "name": "triage-generic",
+  "vuln_class": "Triage",
+  "when": "Langkah pertama menilai kandidat temuan sebelum hunt mendalam."
+ },
+ {
+  "cwe": "CWE-89",
+  "file": "hunt/hunt-sqli.md",
+  "keywords": [
+   "sql",
+   "injection",
+   "database",
+   "query",
+   "parameter"
+  ],
+  "name": "hunt-sqli",
+  "vuln_class": "SQL Injection",
+  "when": "Input user sampai ke query database tanpa sanitasi."
+ },
+ {
+  "cwe": "CWE-79",
+  "file": "hunt/hunt-xss.md",
+  "keywords": [
+   "xss",
+   "script",
+   "reflected",
+   "stored",
+   "dom",
+   "html"
+  ],
+  "name": "hunt-xss",
+  "vuln_class": "Cross-Site Scripting",
+  "when": "Input user dirender sebagai HTML/JS di browser korban."
+ },
+ {
+  "cwe": "CWE-918",
+  "file": "hunt/hunt-ssrf.md",
+  "keywords": [
+   "ssrf",
+   "url fetch",
+   "webhook",
+   "metadata",
+   "internal"
+  ],
+  "name": "hunt-ssrf",
+  "vuln_class": "Server-Side Request Forgery",
+  "when": "Server mengambil URL yang dikendalikan user."
+ },
+ {
+  "cwe": "CWE-639",
+  "file": "hunt/hunt-idor.md",
+  "keywords": [
+   "idor",
+   "object id",
+   "user id",
+   "parameter",
+   "akses objek"
+  ],
+  "name": "hunt-idor",
+  "vuln_class": "Insecure Direct Object Reference",
+  "when": "ID objek di URL/body bisa ditebak dan diakses akun lain."
+ },
+ {
+  "cwe": "CWE-287",
+  "file": "hunt/hunt-auth-bypass.md",
+  "keywords": [
+   "auth",
+   "login",
+   "bypass",
+   "otp",
+   "password reset",
+   "session"
+  ],
+  "name": "hunt-auth-bypass",
+  "vuln_class": "Authentication Bypass",
+  "when": "Login, OTP, atau reset password bisa dilewati tanpa kredensial benar."
+ },
+ {
+  "cwe": "CWE-284",
+  "file": "hunt/hunt-broken-access.md",
+  "keywords": [
+   "access control",
+   "role",
+   "admin",
+   "privilege",
+   "authorization"
+  ],
+  "name": "hunt-broken-access",
+  "vuln_class": "Broken Access Control",
+  "when": "User biasa bisa memakai fungsi atau data role yang lebih tinggi."
+ },
+ {
+  "cwe": "CWE-352",
+  "file": "hunt/hunt-csrf.md",
+  "keywords": [
+   "csrf",
+   "token",
+   "state-changing",
+   "form",
+   "cookie"
+  ],
+  "name": "hunt-csrf",
+  "vuln_class": "Cross-Site Request Forgery",
+  "when": "Aksi sensitif tanpa token anti-CSRF atau tanpa cek origin."
+ },
+ {
+  "cwe": "CWE-611",
+  "file": "hunt/hunt-xxe.md",
+  "keywords": [
+   "xxe",
+   "xml",
+   "parser",
+   "entity",
+   "upload xml"
+  ],
+  "name": "hunt-xxe",
+  "vuln_class": "XML External Entity",
+  "when": "Aplikasi mem-parse XML dari user dengan external entity aktif."
+ },
+ {
+  "cwe": "CWE-94",
+  "file": "hunt/hunt-ssti.md",
+  "keywords": [
+   "ssti",
+   "template",
+   "jinja",
+   "render",
+   "expression"
+  ],
+  "name": "hunt-ssti",
+  "vuln_class": "Server-Side Template Injection",
+  "when": "Input user masuk ke template engine server."
+ },
+ {
+  "cwe": "CWE-94",
+  "file": "hunt/hunt-rce.md",
+  "keywords": [
+   "rce",
+   "command injection",
+   "exec",
+   "shell",
+   "code execution"
+  ],
+  "name": "hunt-rce",
+  "vuln_class": "Remote Code Execution",
+  "when": "Input user sampai ke eksekusi perintah atau kode di server."
+ },
+ {
+  "cwe": "CWE-22",
+  "file": "hunt/hunt-path-traversal.md",
+  "keywords": [
+   "path traversal",
+   "directory",
+   "file path",
+   "download",
+   "../"
+  ],
+  "name": "hunt-path-traversal",
+  "vuln_class": "Path Traversal",
+  "when": "Parameter nama file/path dikendalikan user tanpa normalisasi."
+ },
+ {
+  "cwe": "CWE-601",
+  "file": "hunt/hunt-open-redirect.md",
+  "keywords": [
+   "redirect",
+   "open redirect",
+   "next",
+   "return url",
+   "phishing"
+  ],
+  "name": "hunt-open-redirect",
+  "vuln_class": "Open Redirect",
+  "when": "Parameter URL redirect tidak divalidasi ke domain sendiri."
+ },
+ {
+  "cwe": "CWE-434",
+  "file": "hunt/hunt-file-upload.md",
+  "keywords": [
+   "upload",
+   "file",
+   "extension",
+   "mime",
+   "avatar"
+  ],
+  "name": "hunt-file-upload",
+  "vuln_class": "Unrestricted File Upload",
+  "when": "Upload file tanpa cek tipe, ekstensi, atau isi yang ketat."
+ },
+ {
+  "cwe": "CWE-347",
+  "file": "hunt/hunt-jwt.md",
+  "keywords": [
+   "jwt",
+   "token",
+   "algorithm",
+   "none",
+   "secret"
+  ],
+  "name": "hunt-jwt",
+  "vuln_class": "JWT Weakness",
+  "when": "Token JWT dipakai untuk auth dan bisa dimanipulasi."
+ },
+ {
+  "cwe": "CWE-400",
+  "file": "hunt/hunt-graphql.md",
+  "keywords": [
+   "graphql",
+   "query",
+   "introspection",
+   "mutation",
+   "schema"
+  ],
+  "name": "hunt-graphql",
+  "vuln_class": "GraphQL Abuse",
+  "when": "Endpoint GraphQL terbuka dengan introspection atau query dalam."
+ },
+ {
+  "cwe": "CWE-639",
+  "file": "hunt/hunt-api-bola.md",
+  "keywords": [
+   "bola",
+   "api",
+   "object level",
+   "rest",
+   "endpoint"
+  ],
+  "name": "hunt-api-bola",
+  "vuln_class": "Broken Object Level Authorization (API)",
+  "when": "API REST mengembalikan/mengubah objek milik user lain."
+ },
+ {
+  "cwe": "CWE-840",
+  "file": "hunt/hunt-business-logic.md",
+  "keywords": [
+   "business logic",
+   "harga",
+   "kuantitas",
+   "workflow",
+   "diskon",
+   "limit"
+  ],
+  "name": "hunt-business-logic",
+  "vuln_class": "Business Logic Flaw",
+  "when": "Alur bisnis (harga, kuota, status) bisa dimanipulasi lewat urutan atau nilai."
+ },
+ {
+  "cwe": "CWE-798",
+  "file": "hunt/hunt-secrets.md",
+  "keywords": [
+   "secret",
+   "api key",
+   "credential",
+   "hardcoded",
+   "bundle",
+   "source"
+  ],
+  "name": "hunt-secrets",
+  "vuln_class": "Exposed Secrets",
+  "when": "Kunci atau kredensial bocor di kode, bundle JS, atau respons."
+ },
+ {
+  "cwe": "CWE-200",
+  "file": "hunt/hunt-js-bundle.md",
+  "keywords": [
+   "javascript",
+   "bundle",
+   "source map",
+   "endpoint",
+   "frontend"
+  ],
+  "name": "hunt-js-bundle",
+  "vuln_class": "JS Bundle Exposure",
+  "when": "Bundle JS mengungkap endpoint, logika, atau secret (lihat js-bundle-analysis)."
+ },
+ {
+  "cwe": "CWE-362",
+  "file": "hunt/hunt-race-condition.md",
+  "keywords": [
+   "race",
+   "concurrent",
+   "double spend",
+   "redeem",
+   "coupon"
+  ],
+  "name": "hunt-race-condition",
+  "vuln_class": "Race Condition",
+  "when": "Aksi sekali-pakai bisa dipanggil paralel dan lolos dua kali."
+ },
+ {
+  "cwe": "CWE-502",
+  "file": "hunt/hunt-deserialization.md",
+  "keywords": [
+   "deserialization",
+   "serialize",
+   "pickle",
+   "object",
+   "cookie"
+  ],
+  "name": "hunt-deserialization",
+  "vuln_class": "Insecure Deserialization",
+  "when": "Data serial dari user di-deserialisasi tanpa verifikasi."
+ },
+ {
+  "cwe": "CWE-1321",
+  "file": "hunt/hunt-prototype-pollution.md",
+  "keywords": [
+   "prototype",
+   "pollution",
+   "merge",
+   "__proto__",
+   "javascript"
+  ],
+  "name": "hunt-prototype-pollution",
+  "vuln_class": "Prototype Pollution",
+  "when": "Merge objek JS dari user bisa menulis ke Object.prototype."
+ },
+ {
+  "cwe": "CWE-94",
+  "file": "hunt/hunt-llm-prompt-injection.md",
+  "keywords": [
+   "llm",
+   "prompt injection",
+   "ai",
+   "chatbot",
+   "instruction"
+  ],
+  "name": "hunt-llm-prompt-injection",
+  "vuln_class": "LLM Prompt Injection",
+  "when": "Input user sampai ke prompt LLM dan mengubah instruksinya."
+ },
+ {
+  "cwe": "CWE-707",
+  "file": "bb-methodology.md",
+  "keywords": [
+   "metodologi",
+   "fase",
+   "recon",
+   "threat model",
+   "gate"
+  ],
+  "name": "bb-methodology",
+  "vuln_class": "Methodology",
+  "when": "Butuh alur kerja hunt yang tertib dari recon sampai laporan."
+ },
+ {
+  "cwe": "CWE-707",
+  "file": "report-writing.md",
+  "keywords": [
+   "laporan",
+   "report",
+   "cvss",
+   "severity",
+   "template"
+  ],
+  "name": "report-writing",
+  "vuln_class": "Reporting",
+  "when": "Menulis laporan temuan untuk platform bounty."
+ },
+ {
+  "cwe": "CWE-200",
+  "file": "evidence-hygiene.md",
+  "keywords": [
+   "bukti",
+   "redaksi",
+   "pii",
+   "cookie",
+   "screenshot",
+   "har"
+  ],
+  "name": "evidence-hygiene",
+  "vuln_class": "Evidence Hygiene",
+  "when": "Membersihkan bukti sebelum disimpan atau dilampirkan."
+ },
+ {
+  "cwe": "CWE-707",
+  "file": "triage-validation.md",
+  "keywords": [
+   "triage",
+   "verdict",
+   "confirmed",
+   "rejected",
+   "needs validation"
+  ],
+  "name": "triage-validation",
+  "vuln_class": "Triage",
+  "when": "Menentukan verdict akhir sebuah kandidat temuan."
+ },
+ {
+  "cwe": "CWE-707",
+  "file": "verify-adversarial.md",
+  "keywords": [
+   "verifikasi",
+   "adversarial",
+   "replay",
+   "bantah",
+   "unverified"
+  ],
+  "name": "verify-adversarial",
+  "vuln_class": "Verification",
+  "when": "Menguji kandidat dengan cara membantahnya, bukan membenarkannya."
+ },
+ {
+  "cwe": "CWE-200",
+  "file": "js-bundle-analysis.md",
+  "keywords": [
+   "bundle",
+   "source map",
+   "javascript",
+   "endpoint",
+   "secret"
+  ],
+  "name": "js-bundle-analysis",
+  "vuln_class": "JS Bundle Analysis",
+  "when": "Menganalisis bundle JS untuk endpoint dan secret tersembunyi."
+ },
+ {
+  "name": "vbsec-21",
+  "file": "vbsec-21.md",
+  "vuln_class": "AI Code Vulnerabilities (21 types)",
+  "cwe": "CWE-707",
+  "keywords": [
+   "vbsec",
+   "ai code",
+   "slopsquatting",
+   "checklist",
+   "21 tipe"
+  ],
+  "when": "Pre-scan ringan kode hasil AI sebelum hunting dalam; cari 21 pola vuln termasuk slopsquatting."
+ },
+ {
+  "name": "ghost-loop",
+  "file": "ghost-loop.md",
+  "vuln_class": "Ghostsecurity Loop",
+  "cwe": "CWE-798",
+  "keywords": [
+   "ghostsecurity",
+   "poltergeist",
+   "wraith",
+   "reaper",
+   "exorcist",
+   "secret",
+   "dependency",
+   "osv"
+  ],
+  "when": "Audit repo: cari secret, dependensi rentan, dan pola kode AI dalam satu loop tertib."
+ },
+ {
+  "name": "trailofbits",
+  "file": "trailofbits.md",
+  "vuln_class": "Audit Review",
+  "cwe": "CWE-707",
+  "keywords": [
+   "trail of bits",
+   "fp-check",
+   "cvss",
+   "variant analysis",
+   "semgrep",
+   "fix review",
+   "supply chain"
+  ],
+  "when": "Audit mendalam / review temuan sebelum laporan: skor CVSS v4.0, filter false positive, review perbaikan."
+ },
+ {
+  "name": "review-pr",
+  "file": "review-pr.md",
+  "vuln_class": "PR Security Review",
+  "cwe": "CWE-707",
+  "keywords": [
+   "review pr",
+   "diff-aware",
+   "pull request",
+   "inline comment",
+   "false positive",
+   "github action"
+  ],
+  "when": "Ada PR/diff kode baru yang perlu direview keamanannya sebelum merge."
+ },
+ {
+  "name": "mindmap",
+  "file": "mindmap.md",
+  "vuln_class": "Navigation",
+  "cwe": "CWE-707",
+  "keywords": [
+   "mindmap",
+   "navigasi",
+   "recon",
+   "enumerasi",
+   "scanning",
+   "proxy",
+   "exploit",
+   "peta"
+  ],
+  "when": "Butuh peta jalan hunt dari recon sampai exploit dan skill mana di tiap tahap."
+ },
+ {
+  "name": "shannon-tracing",
+  "file": "shannon-tracing.md",
+  "vuln_class": "White-box Tracing",
+  "cwe": "CWE-707",
+  "keywords": [
+   "shannon",
+   "tracing",
+   "source",
+   "hipotesis",
+   "exploit live",
+   "no exploit no report",
+   "2fa"
+  ],
+  "when": "Target white-box: lacak source ke sink, buat hipotesis, buktikan dengan exploit live terkontrol."
+ },
+ {
+  "name": "sql-wordlist",
+  "file": "sql-wordlist.md",
+  "vuln_class": "SQL Injection Wordlist",
+  "cwe": "CWE-89",
+  "keywords": [
+   "sql",
+   "wordlist",
+   "payload",
+   "sqli",
+   "fuzzing",
+   "curated"
+  ],
+  "when": "Fuzzing parameter yang dicurigai SQLi dengan payload terkurasi (digabung payload hunt/ffuf/sqlmap)."
+ },
+ {
+  "name": "hunt-oauth",
+  "file": "hunt/hunt-oauth.md",
+  "vuln_class": "OAuth Flaws",
+  "cwe": "CWE-287",
+  "keywords": [
+   "oauth",
+   "redirect_uri",
+   "state",
+   "pkce",
+   "audience",
+   "authorization code"
+  ],
+  "when": "Login via OAuth/SSO dengan redirect_uri, state, atau PKCE yang bisa dimanipulasi."
+ },
+ {
+  "name": "hunt-ato",
+  "file": "hunt/hunt-ato.md",
+  "vuln_class": "Account Takeover",
+  "cwe": "CWE-287",
+  "keywords": [
+   "account takeover",
+   "ato",
+   "takeover",
+   "password reset",
+   "credential stuffing",
+   "session hijack"
+  ],
+  "when": "Akun bisa diambil alih lewat reset password, session, atau login lemah."
+ },
+ {
+  "name": "hunt-session",
+  "file": "hunt/hunt-session.md",
+  "vuln_class": "Session Management",
+  "cwe": "CWE-384",
+  "keywords": [
+   "session",
+   "cookie",
+   "session fixation",
+   "session id",
+   "logout",
+   "token"
+  ],
+  "when": "Session ID bisa ditebak, difiksasi, atau tidak kedaluwarsa setelah logout."
+ },
+ {
+  "name": "hunt-forgot-password",
+  "file": "hunt/hunt-forgot-password.md",
+  "vuln_class": "Password Recovery",
+  "cwe": "CWE-640",
+  "keywords": [
+   "forgot password",
+   "reset password",
+   "reset token",
+   "lupa password"
+  ],
+  "when": "Alur lupa/reset password bisa disalahgunakan untuk mengambil alih akun."
+ },
+ {
+  "name": "hunt-saml",
+  "file": "hunt/hunt-saml.md",
+  "vuln_class": "SAML Flaws",
+  "cwe": "CWE-287",
+  "keywords": [
+   "saml",
+   "sso",
+   "assertion",
+   "xml signature",
+   "idp"
+  ],
+  "when": "Login SSO SAML dengan assertion atau signature yang bisa dipalsukan."
+ },
+ {
+  "name": "hunt-cors",
+  "file": "hunt/hunt-cors.md",
+  "vuln_class": "CORS Misconfiguration",
+  "cwe": "CWE-942",
+  "keywords": [
+   "cors",
+   "origin",
+   "access-control-allow-origin",
+   "credentials"
+  ],
+  "when": "CORS mengizinkan origin sembarang dengan credentials."
+ },
+ {
+  "name": "hunt-cache-poison",
+  "file": "hunt/hunt-cache-poison.md",
+  "vuln_class": "Web Cache Poisoning",
+  "cwe": "CWE-444",
+  "keywords": [
+   "cache",
+   "poison",
+   "cdn",
+   "x-forwarded-host",
+   "unkeyed"
+  ],
+  "when": "Respons cache berisi header/input tidak tervalidasi yang bisa diracuni."
+ },
+ {
+  "name": "hunt-websocket",
+  "file": "hunt/hunt-websocket.md",
+  "vuln_class": "WebSocket Flaws",
+  "cwe": "CWE-319",
+  "keywords": [
+   "websocket",
+   "ws",
+   "socket",
+   "cross-site websocket"
+  ],
+  "when": "Koneksi WebSocket tanpa cek origin/auth, atau tanpa enkripsi."
+ }
 ]
