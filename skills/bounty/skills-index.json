@@ -703,5 +703,120 @@
    "operator"
   ],
   "when": "Input sampai ke query NoSQL tanpa sanitasi (operator injection)."
+ },
+ {
+  "name": "hunt-dom",
+  "file": "hunt/hunt-dom.md",
+  "vuln_class": "DOM Cross-Site Scripting",
+  "cwe": "CWE-79",
+  "keywords": [
+   "dom xss",
+   "dom",
+   "sink",
+   "innerHTML",
+   "document.write",
+   "location.hash"
+  ],
+  "when": "Data dari URL/input ditampilkan sebagai markup tanpa penyandian."
+ },
+ {
+  "name": "hunt-nodejs",
+  "file": "hunt/hunt-nodejs.md",
+  "vuln_class": "Node.js Application Weakness",
+  "cwe": "CWE-400",
+  "keywords": [
+   "nodejs",
+   "node",
+   "prototype pollution",
+   "regex dos",
+   "deserialization"
+  ],
+  "when": "Input JSON/pola memengaruhi objek internal atau kinerja aplikasi Node."
+ },
+ {
+  "name": "hunt-http-smuggling",
+  "file": "hunt/hunt-http-smuggling.md",
+  "vuln_class": "HTTP Request Smuggling",
+  "cwe": "CWE-444",
+  "keywords": [
+   "http smuggling",
+   "request smuggling",
+   "desync",
+   "content-length",
+   "transfer-encoding"
+  ],
+  "when": "Dua lapisan server membaca batas request dengan cara berbeda."
+ },
+ {
+  "name": "hunt-jwt-crypto",
+  "file": "hunt/hunt-jwt-crypto.md",
+  "vuln_class": "JWT Authentication Bypass",
+  "cwe": "CWE-347",
+  "keywords": [
+   "jwt",
+   "token",
+   "alg none",
+   "signature",
+   "key confusion"
+  ],
+  "when": "Token diterima walau algoritme/kunci penandanya tidak diverifikasi benar."
+ },
+ {
+  "name": "hunt-llm-ai",
+  "file": "hunt/hunt-llm-ai.md",
+  "vuln_class": "LLM Prompt Injection",
+  "cwe": "CWE-74",
+  "keywords": [
+   "llm",
+   "prompt injection",
+   "ai",
+   "model",
+   "tool",
+   "rag",
+   "system prompt"
+  ],
+  "when": "Konten pengguna diikuti model sebagai perintah atau output model dipercaya mentah."
+ },
+ {
+  "name": "hunt-api-misconfig",
+  "file": "hunt/hunt-api-misconfig.md",
+  "vuln_class": "API Misconfiguration",
+  "cwe": "CWE-1188",
+  "keywords": [
+   "api misconfig",
+   "excessive data",
+   "api version",
+   "security headers",
+   "verbose error"
+  ],
+  "when": "API mengembalikan data berlebih, versi lama aktif, atau header keamanan hilang."
+ },
+ {
+  "name": "web2-recon",
+  "file": "hunt/web2-recon.md",
+  "vuln_class": "Attack Surface Mapping",
+  "cwe": "",
+  "keywords": [
+   "recon",
+   "subdomain",
+   "js bundle",
+   "endpoint",
+   "hidden parameter"
+  ],
+  "when": "Memetakan permukaan aplikasi sebelum hunt (endpoint, parameter, peran)."
+ },
+ {
+  "name": "bug-bounty",
+  "file": "hunt/bug-bounty.md",
+  "vuln_class": "Methodology",
+  "cwe": "",
+  "keywords": [
+   "orchestrator",
+   "methodology",
+   "workflow",
+   "triage",
+   "report"
+  ],
+  "when": "Mengatur urutan hunt, kapan berhenti, dan kapan lapor."
  }
 ]

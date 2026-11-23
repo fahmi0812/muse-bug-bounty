@@ -4,6 +4,14 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.3.1] — 2026-11-23
+
+### Added
+- **8 skill Tier 2 yang tertunda di v1.3.0, kini selesai dengan pendekatan parafrase defensif** (fokus deteksi + validasi akun test, minim payload mentah — ditulis langsung, bukan lewat agen paralel): `hunt-dom` (yang sempat kena flag — kini lolos), `hunt-nodejs`, `hunt-http-smuggling`, `hunt-jwt-crypto`, `hunt-llm-ai`, `hunt-api-misconfig`, `web2-recon`, `bug-bounty` (orkestrator). Index 49 → **57 entri**. Tier 2 dari plan-power-v1.1 kini lengkap.
+- **Metrik router diperbaiki:** `expectedSkillFor()` di `bounty/lib/bench.js` kini memetakan DOM XSS → `hunt-dom` dan kelas LLM → `hunt-llm-ai` (sebelumnya menunjuk skill lama yang sudah digantikan); `routerAccuracy()` menerima skill pengganti yang sah (`hunt-jwt-crypto` untuk JWT, `hunt-dom` untuk XSS) — skill yang lebih dalam terpilih bukan regresi.
+- **Hasil bench (mock):** akurasi router llm-app **33% → 67%** (4/6); juice-shop kembali 70% (7/10), dvga 100%, dvwa 88%, vampi 63%. 3 miss juice-shop tersisa sudah ada sebelum v1.3.1 (credentials, sensitive data exposure, DoS) — bukan regresi.
+- **Batasan jujur v1.3.1:** `hunt-mfa-bypass` + `hunt-host-header` (dari v1.1) masih tertunda — belum dicoba lagi dengan pendekatan ini.
+
 ## [1.3.0] — 2026-11-23
 
 ### Added

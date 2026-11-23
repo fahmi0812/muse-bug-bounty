@@ -95,7 +95,7 @@ const CLASS_TO_SKILL = {
   "cross-site scripting": "hunt-xss",
   "reflected xss": "hunt-xss",
   "stored xss": "hunt-xss",
-  "dom xss": "hunt-xss",
+  "dom xss": "hunt-dom",
   "server-side request forgery": "hunt-ssrf",
   ssrf: "hunt-ssrf",
   "insecure direct object reference": "hunt-idor",
@@ -122,7 +122,13 @@ const CLASS_TO_SKILL = {
   "prototype pollution": "hunt-prototype-pollution",
   "race condition": "hunt-race-condition",
   "graphql": "hunt-graphql",
-  "prompt injection": "hunt-llm-prompt-injection",
+  "prompt injection": "hunt-llm-ai",
+  "indirect prompt injection": "hunt-llm-ai",
+  "sensitive data exfiltration": "hunt-llm-ai",
+  "excessive agency": "hunt-llm-ai",
+  "rag data leakage": "hunt-llm-ai",
+  "system prompt leakage": "hunt-llm-ai",
+  llm: "hunt-llm-ai",
   "exposed secrets": "hunt-secrets",
   "business logic": "hunt-business-logic",
 };
@@ -148,6 +154,16 @@ export function expectedSkillFor(vulnClass = "") {
   return tokens.length ? `hunt-${tokens[0]}` : "triage-generic";
 }
 
+// Skill pengganti yang sah untuk satu kelas: mis. JWT bisa dijawab
+// hunt-jwt maupun hunt-jwt-crypto (perdalamannya). Metrik hit bila
+// salah satunya ada di top-5 — bukan regresi bila skill yang lebih
+// dalam yang terpilih.
+const SKILL_ALTERNATIVES = {
+  "hunt-jwt": ["hunt-jwt-crypto"],
+  "hunt-llm-prompt-injection": ["hunt-llm-ai"],
+  "hunt-xss": ["hunt-dom"],
+};
+
 export function routerAccuracy(oracle = [], routeFn = null, skills = null) {
   const router = routeFn ?? ((ctx) => routeSkills(ctx, skills ?? loadSkillsIndex()));
   const perEntry = [];
@@ -157,7 +173,7 @@ export function routerAccuracy(oracle = [], routeFn = null, skills = null) {
     const context = `${vulnClass} ${v.endpoint ?? v.path ?? ""} ${v.cwe ?? ""}`.trim();
     const selected = router(context).map((s) => String(s?.name ?? s).toLowerCase());
     const expected = expectedSkillFor(vulnClass);
-    const isHit = selected.includes(expected);
+    const isHit = selected.includes(expected) || (SKILL_ALTERNATIVES[expected] ?? []).some((a) => selected.includes(a));
     if (isHit) hit += 1;
     perEntry.push({ endpoint: v.endpoint ?? v.path ?? "", vuln_class: vulnClass, expected, selected, hit: isHit });
   }
