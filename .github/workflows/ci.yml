@@ -30,7 +30,7 @@ jobs:
 
       - name: Syntax check (node --check)
         run: |
-          for f in bounty/bin/*.mjs bounty/lib/*.mjs scripts/install.js eval/run-bench.mjs tests/*.test.js; do
+          for f in bounty/bin/*.mjs bounty/lib/*.js scripts/install.js eval/run-bench.mjs tests/*.test.js; do
             node --check "$f"
           done
 
