@@ -4,6 +4,18 @@ Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
 ## [Unreleased]
 
+## [1.5.0] — 2026-11-23
+
+### Added
+- **v1.5 — semua P0 deep research (P0-2 s.d. P0-7), berurutan:**
+  - **P0-2 pola bersitasi:** `bounty/data/report-patterns.json` 12 → **85 pola (73 bersitasi)** dari `docs/disclosed-reports` Claude-BugHunter (CC-BY-4.0, atribusi di `patterns.js`); tiap pola pakai link `hackerone.com/reports/<id>` yang disalin dari contoh bernama upstream, 3 dicek live (2262382, 745324, 925585). 14 skill kini punya ≥4 pola bersitasi (bonus router +0,15 penuh). `bounty patterns [--skill X]` tampilkan hitungan + link. Jujur: 71 pola `payout`/`tahun` null (upstream tidak menyebut tahun terverifikasi — tidak disalin); pola untuk skill lain (xss, idor, jwt-crypto, mfa-bypass, dsb.) belum ada karena upstream tidak mencantumkan ID H1 bernama di contohnya.
+  - **P0-3 recon pipeline:** `bounty/lib/recon.js` — `bounty recon --tool subfinder|dnsx|httpx|katana|nuclei-kev|crtsh` + `bounty recon --update-templates` (nuclei KEV subset, `-tags kev`). Scope gate host-only untuk enum domain. Flag CLI PD best-effort (binary tidak ada di VM).
+  - **P0-4 JS mining:** `bounty/lib/jsmining.js` — `bounty scan --tool jsluice|sourcemapper`; nilai secret TIDAK PERNAH masuk kandidat/store (hanya jenis + catatan).
+  - **P0-5 OAST:** `bounty/lib/oast.js` — `bounty oast start|poll|stop` (interactsh-client, server self-hosted via `INTERACTSH_SERVER`, token tidak pernah masuk objek sesi/log).
+  - **P0-6 LLM 2026:** `skills/bounty/hunt/hunt-llm-2026.md` (OWASP LLM Top 10 2026: LLM01–LLM10) + `hunt-llm-agentic.md` (ASI01–ASI10), `bounty/lib/llm-runners.js` (`bounty scan --tool garak-agent-breaker|pyrit`, Crescendo/TAP), `eval/benchmarks/llmvault.md` (verifikasi oracle Play Mode 25 flag = langkah laptop). Index skill 59 → 61.
+  - **P0-7 platform read-only:** `bounty/lib/platforms.js` — `bounty platform scope|hacktivity|draft|sync-scope` (HackerOne/Bugcrowd, token hanya dari env, tanpa satu pun jalur submit/pembayaran; `draft` = Markdown bertanda DRAFT, kirim manual). Hacktivity H1 via feed publik (best-effort, tanpa REST resmi); Bugcrowd tanpa pencarian laporan publik.
+- **Batasan jujur v1.5.0:** semua runner baru belum pernah jalan live (binary tidak ada di VM — flag CLI best-effort, perlu `strix --help`/cek binary di laptop); baseline live P0-1 tetap menunggu laptop; oracle LLMVault tetap belum terverifikasi.
+
 ## [1.4.0] — 2026-11-23
 
 ### Added

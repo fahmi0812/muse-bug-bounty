@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // bounty — zero-dependency CLI wrapper (Node >= 20).
 // Commands: provider | run | review | report | bench | install | programs | findings | scan | memory | graph | trace | --help | --version
-import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, accessSync, constants, readdirSync, statSync, mkdirSync } from "node:fs";
 import { resolve, join, delimiter, dirname } from "node:path";
 import { spawnSync, spawn } from "node:child_process";
 import { createInterface } from "node:readline";
@@ -24,11 +24,16 @@ import { readSarif } from "../lib/sarif.js";
 import { recordEpisode, listEpisodes, listLessons, addLesson, findSimilar, recordCoverage } from "../lib/memory.js";
 import { listNodes, listEdges, traceFinding } from "../lib/graph.js";
 import { routeWithLessons } from "../lib/router.js";
-import { loadPatterns } from "../lib/patterns.js";
+import { loadPatterns, citedPatterns, patternEvidence } from "../lib/patterns.js";
+import { runSubfinder, runDnsx, runHttpx, runKatana, runNucleiKev, updateNucleiTemplates, crtsh, RECON_TOOLS } from "../lib/recon.js";
+import { runJsluice, runSourcemapper } from "../lib/jsmining.js";
+import { startInteractsh, pollInteractsh, stopInteractsh } from "../lib/oast.js";
+import { runGarakAgentBreaker, runPyrit } from "../lib/llm-runners.js";
+import { getProgramScope, searchHacktivity, draftReport, syncScopeToProgram } from "../lib/platforms.js";
 import { expectedSkillFor } from "../lib/bench.js";
 import { fileURLToPath } from "node:url";
 
-export const VERSION = "1.4.0";
+export const VERSION = "1.5.0";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (untuk --skills-dir): bounty/bin/ -> ../../
@@ -68,11 +73,35 @@ Penggunaan:
       Render laporan temuan ke stdout (atau file).
   bounty bench [--lab NAME] [--runs N]
       Jalankan benchmark (eval/run-bench.mjs bila ada, fallback mock).
-  bounty scan --tool nuclei|dalfox|ffuf|arjun|graphql-cop|gitleaks|trufflehog|osv-scanner|garak|deepteam --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N] [--path DIR] [--model MODEL]
-      --path: checkout lokal untuk osv-scanner. --model: model LLM untuk garak/deepteam.
+  bounty scan --tool nuclei|dalfox|ffuf|arjun|graphql-cop|gitleaks|trufflehog|osv-scanner|garak|deepteam|jsluice|sourcemapper|garak-agent-breaker|pyrit --target URL --program programs/<nama>.md [--wordlist FILE] [--timeout-ms N] [--path DIR] [--model MODEL] [--strategy crescendo|tap] [--objective "..."]
+      --path: checkout lokal untuk osv-scanner. --model: model LLM untuk garak/deepteam/agent-breaker/pyrit.
+      jsluice: target boleh URL JS atau file JS lokal. sourcemapper: --map-url URL .map, --output-dir DIR.
+      pyrit: --strategy crescendo (default) atau tap; --objective wajib untuk pyrit.
       Jalankan satu scanner klasik on-demand dalam scope program.
       Binary tidak ada -> dilewati (bukan error). Hasil = kandidat
       (UNVERIFIED) di store; review dulu di 'bounty review'.
+  bounty recon --tool subfinder|dnsx|httpx|katana|nuclei-kev|crtsh --target DOMAIN-atau-URL --program programs/<nama>.md [--timeout-ms N]
+      Pipeline recon ProjectDiscovery + crt.sh pasif. subfinder/dnsx/httpx/crtsh
+      mengembalikan daftar aset (bukan klaim vuln); katana/nuclei-kev menyimpan
+      kandidat ke store. Binary tidak ada -> dilewati (bukan error).
+  bounty recon --update-templates
+      Perbarui template nuclei (nuclei -update-templates).
+  bounty oast start [--server URL] [--number N] | bounty oast poll | bounty oast stop
+      Sesi interactsh OAST untuk blind SSRF/XXE/SQLi/RCE. start jalan di
+      foreground (Ctrl-C berhenti), poll dibaca dari terminal lain.
+      Payload hanya disuntikkan ke target in-scope.
+  bounty platform scope --platform hackerone|bugcrowd --handle NAMA
+      Lihat scope program (read-only, token dari env HACKERONE_TOKEN /
+      HACKERONE_USERNAME / BUGCROWD_TOKEN).
+  bounty platform hacktivity --platform hackerone --query "..."
+      Cari laporan publik (cek duplikat sebelum menulis draf).
+  bounty platform draft --finding <id>
+      Buat draf laporan Markdown dari kandidat (DRAFT — kirim manual).
+  bounty platform sync-scope --platform hackerone|bugcrowd --handle NAMA --program programs/<nama>.md
+      Bandingkan scope platform vs program lokal (hanya bandingkan,
+      tidak menulis file).
+  bounty patterns [--skill <nama>]
+      Pustaka pola laporan: total, bersitasi, per skill (+ bonus router).
   bounty install [--strix]
       Cek/instal Strix via curl resmi (hanya tampilkan perintah, tidak auto-run pipe-to-shell).
   bounty --help | bounty --version
@@ -558,12 +587,14 @@ function cmdReport(args) {
   }
 }
 
+const SCAN_TOOLS = [...SUPPORTED_TOOLS, "jsluice", "sourcemapper", "garak-agent-breaker", "pyrit"];
+
 async function cmdScan(args) {
   const tool = String(args.tool ?? "").toLowerCase();
   const target = args.target;
   const programPath = args.program || resolve(process.cwd(), "programs/example.md");
-  if (!SUPPORTED_TOOLS.includes(tool)) {
-    console.error(`--tool wajib: ${SUPPORTED_TOOLS.join(" | ")} (dapat: "${tool || ""}")`);
+  if (!SCAN_TOOLS.includes(tool)) {
+    console.error(`--tool wajib: ${SCAN_TOOLS.join(" | ")} (dapat: "${tool || ""}")`);
     return 2;
   }
   if (!existsSync(programPath)) {
@@ -576,21 +607,40 @@ async function cmdScan(args) {
     return 2;
   }
   const program = loadProgramFile(programPath);
-  const scope = checkScope(program, target);
+  // jsluice boleh menarget file JS lokal (bukan URL) — scope gate URL
+  // ditangani lib jsmining untuk URL; file lokal adalah input pengguna.
+  const isLocalJs = tool === "jsluice" && !/^https?:\/\//i.test(String(target));
+  const scope = isLocalJs ? { ok: true } : checkScope(program, target);
   console.log(scope.ok ? "Scope OK" : `Scope DITOLAK: ${scope.reason}`);
   if (!scope.ok) {
     try { logAudit({ command: "scan", tool, target, program: program.name, result: "blocked" }); } catch {}
     return 2;
   }
   try { logAudit({ command: "scan", tool, target, program: program.name, result: "started" }); } catch {}
-  const result = runTool(tool, {
-    target,
-    program,
-    timeoutMs: Number(args["timeout-ms"] ?? 120000),
-    wordlist: args.wordlist,
-    localPath: args.path,
-    model: args.model,
-  });
+  const timeoutMs = Number(args["timeout-ms"] ?? 120000);
+  let result;
+  if (SUPPORTED_TOOLS.includes(tool)) {
+    result = runTool(tool, {
+      target,
+      program,
+      timeoutMs,
+      wordlist: args.wordlist,
+      localPath: args.path,
+      model: args.model,
+    });
+  } else if (tool === "jsluice") {
+    result = runJsluice(target, { program, timeoutMs });
+  } else if (tool === "sourcemapper") {
+    result = runSourcemapper(target, { program, timeoutMs, mapUrl: args["map-url"] ?? "", outputDir: args["output-dir"] ?? "" });
+  } else if (tool === "garak-agent-breaker") {
+    result = runGarakAgentBreaker(target, { program, timeoutMs, model: args.model, generatorConfig: args["generator-config"] });
+  } else if (tool === "pyrit") {
+    if (!args.objective) {
+      console.error("--objective wajib untuk pyrit (tujuan serangan, mis. \"bypass filter prompt\").");
+      return 2;
+    }
+    result = runPyrit(target, { program, timeoutMs, strategy: args.strategy ?? "crescendo", objective: args.objective, model: args.model, maxTurns: Number(args["max-turns"] ?? 10) });
+  }
   if (result.error) {
     console.error(result.error);
     try { logAudit({ command: "scan", tool, target, program: program.name, result: "error" }); } catch {}
@@ -601,22 +651,195 @@ async function cmdScan(args) {
     try { logAudit({ command: "scan", tool, target, program: program.name, result: "skipped" }); } catch {}
     return 0;
   }
+  if (tool === "sourcemapper") {
+    console.log(`[sourcemapper] ${result.files.length} file sumber diekstrak ke ${result.outDir || "(dihapus: kosong)"}.`);
+    if (result.files.length) for (const f of result.files.slice(0, 20)) console.log(`  ${f}`);
+    try { logAudit({ command: "scan", tool, target, program: program.name, result: "ok" }); } catch {}
+    return 0;
+  }
+  const findings = result.findings ?? [];
   // Simpan kandidat ke store (dedup vs yang sudah ada di program ini).
   const store = new Store();
   try {
     const existing = store.listCandidates(program.name, "candidate")
       .map((c) => ({ endpoint: c.endpoint, method: c.method, param: c.param, vuln_class: c.vuln_class, cwe: c.cwe }));
-    const { unique } = dedupCandidates([...existing, ...result.findings]);
+    const { unique } = dedupCandidates([...existing, ...findings]);
     const fresh = unique.slice(existing.length);
     let added = 0;
     for (const f of fresh) {
       store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
       added++;
     }
-    console.log(`[${tool}] ${result.rawCount} temuan mentah, ${added} kandidat baru masuk store (dedup: ${result.findings.length - added} duplikat) dalam ${result.time_ms} ms.`);
+    console.log(`[${tool}] ${result.rawCount} temuan mentah, ${added} kandidat baru masuk store (dedup: ${findings.length - added} duplikat) dalam ${result.time_ms} ms.`);
     console.log(`Lihat antrean: bounty review  |  bounty findings --program ${program.name}`);
   } finally { store.close(); }
   try { logAudit({ command: "scan", tool, target, program: program.name, result: "ok" }); } catch {}
+  return 0;
+}
+
+async function cmdRecon(args) {
+  if (args["update-templates"]) {
+    const r = updateNucleiTemplates({});
+    if (r.skipped) { console.log(`Dilewati: ${r.reason}`); return 0; }
+    if (r.error) { console.error(r.error); return 2; }
+    console.log(`Template nuclei diperbarui${r.version ? ` (versi ${r.version})` : ""}.`);
+    return 0;
+  }
+  const tool = String(args.tool ?? "").toLowerCase();
+  const target = args.target;
+  const programPath = args.program || resolve(process.cwd(), "programs/example.md");
+  if (!RECON_TOOLS.includes(tool)) {
+    console.error(`--tool wajib: ${RECON_TOOLS.join(" | ")} (dapat: "${tool || ""}")`);
+    return 2;
+  }
+  if (!target) { console.error("--target DOMAIN atau URL wajib."); return 2; }
+  if (!existsSync(programPath)) { console.error(`Program tidak ditemukan: ${programPath}`); return 2; }
+  const program = loadProgramFile(programPath);
+  const timeoutMs = Number(args["timeout-ms"] ?? 120000);
+  let result;
+  if (tool === "subfinder") result = runSubfinder(target, { program, timeoutMs });
+  else if (tool === "dnsx") result = runDnsx(String(target).split(","), { program, timeoutMs });
+  else if (tool === "httpx") result = runHttpx(String(target).split(","), { program, timeoutMs });
+  else if (tool === "katana") result = runKatana(target, { program, timeoutMs });
+  else if (tool === "nuclei-kev") result = runNucleiKev(target, { program, timeoutMs });
+  else if (tool === "crtsh") result = await crtsh(target, { program });
+  if (result.error) { console.error(result.error); return 2; }
+  if (result.blocked) { console.log(`Scope DITOLAK: ${result.reason}`); return 2; }
+  if (result.skipped) { console.log(`Dilewati: ${result.reason}`); return 0; }
+  const results = result.results ?? [];
+  console.log(`[${tool}] ${results.length} hasil dalam ${result.time_ms} ms.`);
+  for (const r of results.slice(0, 20)) console.log(`  ${typeof r === "string" ? r : JSON.stringify(r)}`);
+  if (results.length > 20) console.log(`  ... dan ${results.length - 20} lagi.`);
+  const findings = result.findings ?? [];
+  if (!findings.length) return 0;
+  const store = new Store();
+  try {
+    const existing = store.listCandidates(program.name, "candidate")
+      .map((c) => ({ endpoint: c.endpoint, method: c.method, param: c.param, vuln_class: c.vuln_class, cwe: c.cwe }));
+    const { unique } = dedupCandidates([...existing, ...findings]);
+    const fresh = unique.slice(existing.length);
+    for (const f of fresh) store.addCandidate({ program: program.name, endpoint: f.endpoint, method: f.method, param: f.param, vulnClass: f.vulnClass, cwe: f.cwe });
+    console.log(`${fresh.length} kandidat baru masuk store. Lihat: bounty review | bounty findings --program ${program.name}`);
+  } finally { store.close(); }
+  return 0;
+}
+
+async function cmdOast(args) {
+  const sub = String(args._[1] ?? "");
+  const sessionFile = join(process.cwd(), ".bounty", "oast-session.json");
+  if (sub === "start") {
+    const session = await startInteractsh({ server: args.server ?? "", token: args.token ?? "", number: Number(args.number ?? 1) });
+    if (session.skipped) { console.log(`Dilewati: ${session.reason}`); return 0; }
+    if (session.error) { console.error(session.error); return 2; }
+    mkdirSync(join(process.cwd(), ".bounty"), { recursive: true, mode: 0o700 });
+    const { proc, ...saved } = session;
+    writeFileSync(sessionFile, JSON.stringify({ ...saved, _seen: 0 }, null, 2), { mode: 0o600 });
+    console.log(`OAST siap: ${session.domain}`);
+    console.log(`Payload: ${session.payload}`);
+    console.log("Suntikkan payload ke target in-scope, lalu baca callback dari terminal lain: bounty oast poll");
+    console.log("Tekan Ctrl-C untuk berhenti.");
+    process.on("SIGINT", () => { try { stopInteractsh(session); } catch {} process.exit(0); });
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 5000));
+      const polled = pollInteractsh(session);
+      for (const cb of polled.callbacks ?? []) console.log(`[callback] ${JSON.stringify(cb)}`);
+    }
+  }
+  if (sub === "poll") {
+    if (!existsSync(sessionFile)) { console.error("Tidak ada sesi OAST (.bounty/oast-session.json) — jalankan 'bounty oast start' dulu."); return 2; }
+    const saved = JSON.parse(readFileSync(sessionFile, "utf8"));
+    const polled = pollInteractsh(saved);
+    if (polled.error) { console.error(polled.error); return 2; }
+    console.log(`${polled.callbacks.length} callback baru (total ${polled.total}).`);
+    for (const cb of polled.callbacks) console.log(`  ${JSON.stringify(cb)}`);
+    return 0;
+  }
+  if (sub === "stop") {
+    if (!existsSync(sessionFile)) { console.log("Tidak ada sesi OAST yang berjalan."); return 0; }
+    const saved = JSON.parse(readFileSync(sessionFile, "utf8"));
+    try { stopInteractsh(saved); } catch {}
+    if (saved.pid) { try { process.kill(saved.pid, "SIGTERM"); } catch {} }
+    try { (await import("node:fs")).unlinkSync(sessionFile); } catch {}
+    console.log("Sesi OAST dihentikan.");
+    return 0;
+  }
+  console.error("Pakai: bounty oast start [--server URL] [--number N] | bounty oast poll | bounty oast stop");
+  return 2;
+}
+
+async function cmdPlatform(args) {
+  const sub = String(args._[1] ?? "");
+  const platform = String(args.platform ?? "hackerone").toLowerCase();
+  if (sub === "scope") {
+    const handle = args.handle;
+    if (!handle) { console.error("--handle NAMA program wajib."); return 2; }
+    const res = await getProgramScope(platform, handle, {});
+    if (res.error) { console.error(`Gagal: ${res.error}`); return 2; }
+    console.log(`Scope ${platform}/${handle}: ${res.assets.length} aset.`);
+    for (const a of res.assets.slice(0, 30)) console.log(`  ${a.type}: ${a.identifier}${a.eligible === false ? " (tidak eligible)" : ""}`);
+    return 0;
+  }
+  if (sub === "hacktivity") {
+    const res = await searchHacktivity(platform, args.query ?? "", {});
+    if (res.error) { console.error(`Gagal: ${res.error}`); return 2; }
+    console.log(`${res.length} laporan publik ditemukan.`);
+    for (const r of res.slice(0, 10)) console.log(`  [${r.state}] ${r.title} — ${r.url}`);
+    return 0;
+  }
+  if (sub === "draft") {
+    const id = Number(args.finding);
+    if (!id) { console.error("--finding <id> wajib (id kandidat dari 'bounty findings')."); return 2; }
+    const store = new Store();
+    try {
+      const row = store.listCandidates(null, "candidate").find((c) => c.id === id);
+      if (!row) { console.error(`Kandidat id ${id} tidak ditemukan.`); return 2; }
+      const out = args.out ? resolve(String(args.out)) : null;
+      const text = draftReport({ title: row.vuln_class, endpoint: row.endpoint, vulnClass: row.vuln_class, cwe: row.cwe, severity: "medium", evidence: `Kandidat #${row.id} program ${row.program}`, steps: "Lihat bounty trace / review untuk langkah reproduksi." });
+      if (out) { writeFileSync(out, text); console.log(`Draf ditulis ke ${out} (DRAFT — kirim manual setelah review).`); }
+      else console.log(text);
+      return 0;
+    } finally { store.close(); }
+  }
+  if (sub === "sync-scope") {
+    const handle = args.handle;
+    const programPath = args.program;
+    if (!handle || !programPath) { console.error("--handle NAMA dan --program programs/<nama>.md wajib."); return 2; }
+    const res = await syncScopeToProgram(platform, handle, programPath, {});
+    if (res.error) { console.error(`Gagal: ${res.error}`); return 2; }
+    console.log(`Scope ${platform}/${handle} vs ${programPath}:`);
+    console.log(`  + ${res.added.length} aset baru di platform (belum di program lokal)`);
+    for (const a of res.added.slice(0, 10)) console.log(`    + ${a}`);
+    console.log(`  - ${res.removed.length} aset di program lokal tapi tidak di platform`);
+    for (const a of res.removed.slice(0, 10)) console.log(`    - ${a}`);
+    console.log(`  = ${res.unchanged.length} aset sama. Hanya perbandingan — file tidak diubah.`);
+    return 0;
+  }
+  console.error("Pakai: bounty platform scope|hacktivity|draft|sync-scope ... (read-only, tanpa auto-submit)");
+  return 2;
+}
+
+function cmdPatterns(args) {
+  const patterns = loadPatterns();
+  const cited = citedPatterns(patterns);
+  const skill = args.skill ? String(args.skill) : "";
+  if (skill) {
+    const ev = patternEvidence(skill, "", patterns);
+    console.log(`Pola untuk ${skill}: ${ev.total} total, ${ev.cited} bersitasi, ${ev.uncited} tanpa sitasi.`);
+    for (const p of patterns.filter((x) => x.skill === skill && !x.uncited)) {
+      console.log(`  - ${p.subclass} (${p.cwe ?? "-"}) — ${p.link}`);
+    }
+    return 0;
+  }
+  console.log(`Pustaka pola laporan: ${patterns.length} total, ${cited.length} bersitasi, ${patterns.length - cited.length} tanpa sitasi.`);
+  const bySkill = {};
+  for (const p of patterns) {
+    bySkill[p.skill] ??= { total: 0, cited: 0 };
+    bySkill[p.skill].total++;
+    if (!p.uncited) bySkill[p.skill].cited++;
+  }
+  for (const [s, v] of Object.entries(bySkill).sort((a, b) => b[1].cited - a[1].cited)) {
+    console.log(`  ${s}: ${v.cited}/${v.total} bersitasi`);
+  }
   return 0;
 }
 
@@ -690,6 +913,10 @@ export async function main(argv = process.argv.slice(2)) {
     case "report": return cmdReport(args);
     case "bench": return await cmdBench(args);
     case "scan": return await cmdScan(args);
+    case "recon": return await cmdRecon(args);
+    case "oast": return await cmdOast(args);
+    case "platform": return await cmdPlatform(args);
+    case "patterns": return cmdPatterns(args);
     case "install": return cmdInstall(args);
     default:
       console.error(`Perintah tidak dikenal: ${cmd}\n`);

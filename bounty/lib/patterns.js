@@ -5,8 +5,18 @@
 // HackerOne/CVE itu nyata dan dikenal dari riset; bila tidak yakin, isi
 // null dan uncited=true. Jangan pernah mengarang ID laporan, CVE, tahun,
 // atau payout. Seed v1.2 berisi 12 pola (8 skill Tier 1 + sqli/xss/idor/
-// ssrf), semuanya uncited — pola bersitasi ditambahkan belakangan hanya
-// dari laporan yang terverifikasi.
+// ssrf), semuanya uncited.
+// P0-2 (v1.4.x): +73 pola BERSITASI dari Claude-BugHunter
+// (elementalsouls/Claude-BugHunter, konten CC-BY-4.0 — adaptasi dengan
+// atribusi; lihat docs/disclosed-reports/*.md di repo itu). Tiap pola
+// bersitasi memakai h1_report_id + link hackerone.com/reports/<id> yang
+// disalin dari contoh bernama di file-file itu; 3 laporan dicek langsung
+// di halaman H1 (2262382, 745324, 925585 — semuanya halaman publik nyata).
+// payout/tahun HANYA diisi bila terverifikasi dari halaman H1 itu sendiri
+// (745324: 2019/$20.000, 925585: 2020/$30.000); 71 pola lainnya payout dan
+// tahun tetap null karena file sumber menyebut payout tanpa tahun yang
+// terverifikasi, dan payout-tanpa-tahun dilarang oleh validatePattern.
+// Angka payout di file sumber TIDAK disalin tanpa tahun — baca di sana.
 import { readFileSync, existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,10 +34,14 @@ export function validatePattern(p) {
   if (typeof p.subclass !== "string" || !p.subclass) throw new Error("pola.subclass harus string tak kosong");
   if (typeof p.cwe !== "string" || !/^CWE-\d+$/.test(p.cwe)) throw new Error(`pola.cwe tidak valid: ${p.cwe}`);
   if (typeof p.uncited !== "boolean") throw new Error("pola.uncited harus boolean");
-  // Konsistensi sitasi: tanpa h1_report_id -> wajib uncited; dengan
-  // h1_report_id -> wajib bersitasi (uncited=false) + link.
-  if (p.h1_report_id == null && p.uncited !== true) {
-    throw new Error(`pola ${p.skill}/${p.subclass}: tanpa h1_report_id harus uncited=true`);
+  // Link yang ada harus URL http(s) asli — bukan placeholder/teks bebas.
+  if (p.link != null && !/^https?:\/\/\S+$/.test(p.link)) {
+    throw new Error(`pola ${p.skill}/${p.subclass}: link tidak valid: ${p.link}`);
+  }
+  // Konsistensi sitasi: tanpa h1_report_id DAN tanpa link -> wajib uncited;
+  // dengan h1_report_id -> wajib bersitasi (uncited=false) + link.
+  if (p.h1_report_id == null && p.link == null && p.uncited !== true) {
+    throw new Error(`pola ${p.skill}/${p.subclass}: tanpa h1_report_id dan tanpa link harus uncited=true`);
   }
   if (p.h1_report_id != null) {
     if (p.uncited !== false) throw new Error(`pola ${p.skill}/${p.subclass}: ada h1_report_id tapi uncited=true`);
@@ -67,6 +81,13 @@ export function patternsForSkill(skill, patterns = null) {
   return list.filter((p) => p?.skill === skill);
 }
 
+// Hanya pola BERSITASI (uncited=false, punya link terverifikasi) —
+// inilah yang dihitung router sebagai bukti; pola uncited = 0 bukti.
+export function citedPatterns(patterns = null) {
+  const list = patterns ?? loadPatterns();
+  return list.filter((p) => p?.uncited === false && typeof p?.link === "string" && /^https?:\/\//.test(p.link));
+}
+
 function normClass(v) {
   return String(v ?? "").trim().toLowerCase();
 }
@@ -89,4 +110,4 @@ export function patternEvidence(skill, vulnClass = "", patterns = null) {
   return { skill, vulnClass: vulnClass || "", cited, uncited, total: cited + uncited };
 }
 
-export default { loadPatterns, validatePattern, patternsForSkill, patternEvidence };
+export default { loadPatterns, validatePattern, patternsForSkill, citedPatterns, patternEvidence };

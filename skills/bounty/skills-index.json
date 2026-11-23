@@ -847,5 +847,35 @@
    "x-forwarded-host"
   ],
   "when": "Header Host dipakai mentah untuk tautan, redirect, atau kunci cache."
+ },
+ {
+  "name": "hunt-llm-2026",
+  "file": "hunt/hunt-llm-2026.md",
+  "vuln_class": "LLM Top 10 2026",
+  "cwe": "CWE-74",
+  "keywords": [
+   "llm",
+   "owasp 2026",
+   "agentic",
+   "prompt injection",
+   "excessive agency",
+   "rag"
+  ],
+  "when": "Target LLM/agent: pakai pemetaan OWASP LLM Top 10 2026 + ASI01-10."
+ },
+ {
+  "name": "hunt-llm-agentic",
+  "file": "hunt/hunt-llm-agentic.md",
+  "vuln_class": "Agentic AI Vulnerability",
+  "cwe": "CWE-74",
+  "keywords": [
+   "agent",
+   "agentic",
+   "tool misuse",
+   "memory poisoning",
+   "goal hijack",
+   "asi"
+  ],
+  "when": "Target agen AI: goal hijack, tool misuse, memory poisoning, cascading failure."
  }
 ]
