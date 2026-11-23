@@ -24,7 +24,7 @@ import { runTool, SUPPORTED_TOOLS } from "../lib/runners.js";
 import { budgetStatus } from "../lib/cost.js";
 import { runQueue } from "../lib/queue.js";
 import { readSarif } from "../lib/sarif.js";
-import { recordEpisode, listEpisodes, listLessons, addLesson, findSimilar, recordCoverage } from "../lib/memory.js";
+import { recordEpisode, listEpisodes, listLessons, addLesson, findSimilar, recordCoverage, listCoverage } from "../lib/memory.js";
 import { listNodes, listEdges, traceFinding } from "../lib/graph.js";
 import { routeWithLessons } from "../lib/router.js";
 import { loadPatterns, citedPatterns, patternEvidence } from "../lib/patterns.js";
@@ -308,7 +308,10 @@ async function runSingleTarget(args, targetOverride = null) {
   printScope(scope.ok, scope.reason);
   if (!scope.ok) {
     try { logAudit({ command: "run", target, program: program.name, result: "blocked" }); } catch {}
-    return 2;
+    // Harus kembalikan bentuk hasil {code,...}; cmdRun membaca r.code.
+    // Mengembalikan angka telanjang bikin r.code undefined -> exit 0 (bug:
+    // scope gate gagal tapi dilaporkan sukses).
+    return { code: 2, usd: 0, added: 0, findings: [] };
   }
   mark.scope = Date.now();
 
