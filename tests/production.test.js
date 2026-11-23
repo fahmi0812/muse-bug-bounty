@@ -36,7 +36,7 @@ test('production: CHANGELOG menyebut 1.0.0', () => {
 test('production: ci.yml valid YAML sederhana dan menjalankan npm test', () => {
   const ci = read('.github/workflows/ci.yml');
   assert.match(ci, /npm test/);
-  assert.match(ci, /node-version:\s*20/);
+  assert.match(ci, /node-version:\s*24/);
   assert.match(ci, /gitleaks/i);
   assert.match(ci, /node --check/);
   // Parse manual sederhana: tiap baris non-kosong bukan tab, dan

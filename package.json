@@ -5,7 +5,7 @@
   "dependencies": {},
   "description": "Zero-dependency Node.js wrapper for bug bounty hunting (Strix extension-first, scope-gated, budget-capped).",
   "engines": {
-    "node": ">=20"
+    "node": ">=24"
   },
   "license": "Apache-2.0",
   "name": "muse-bug-bounty",
