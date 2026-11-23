@@ -1,0 +1,43 @@
+# .github/workflows/security-review.yml
+# Review PR diff-aware (lihat skills/bounty/review-pr.md).
+# Jalan saat PR dibuka/di-update: review diff, tulis komentar inline +
+# ringkasan. Temuan blocking => check gagal; nit tidak memblokir.
+# Action ini antrean awal — keputusan merge tetap di tangan reviewer.
+name: Security Review
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  security-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Diff-aware security review
+        # Placeholder yang aman: daftarkan file berubah + pola berisiko.
+        # Ganti langkah ini dengan reviewer diff-aware (mis. action
+        # claude-code-security-review) bila sudah disetujui.
+        # Langkah ini TIDAK menjalankan payload ke layanan mana pun.
+        run: |
+          echo "## Security review (diff-aware, pass 1)" > review.md
+          echo "" >> review.md
+          git diff --name-only "origin/${{ github.base_ref }}...HEAD" >> review.md
+          echo "" >> review.md
+          echo "Pola berisiko yang dicari (lihat skills/bounty/vbsec-21.md):" >> review.md
+          git diff "origin/${{ github.base_ref }}...HEAD" | grep -nE "eval\(|exec\(|innerHTML|password\s*=|api[_-]?key\s*=|TODO.*secret" >> review.md || echo "Tidak ada pola berisiko sederhana yang cocok." >> review.md
+          cat review.md
+
+      - name: Second-pass false-positive filter (catatan)
+        run: |
+          echo "Pass 2: baca ulang tiap temuan dengan kacamata pembela kode."
+          echo "Temuan yang terbantah (sudah ada validasi / unreachable / pola yang dimaksud) dihapus sebelum komentar disampaikan."
+          echo "Lihat skills/bounty/review-pr.md bagian second-pass."
