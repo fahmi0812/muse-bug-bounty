@@ -108,18 +108,78 @@ export function loadProviders(dir) {
   }
 }
 
-export function writeStrixConfig(model, baseUrl, apiKey, type = "openai") {
-  const dir = join(homedir(), ".strix");
-  mkdirSync(dir, { recursive: true, mode: 0o700 });
-  const t = String(type).toLowerCase() === "anthropic" ? "anthropic" : "openai";
-  const config = {
+// Kredensial lengkap (termasuk apiKey) untuk dipakai run — meta
+// (providers.json) sengaja TIDAK menyimpan key.
+export function loadProviderCreds(dir) {
+  const targetDir = resolve(dir ?? join(process.cwd(), ".bounty", "providers"));
+  const credPath = join(targetDir, "credentials.json");
+  if (!existsSync(credPath)) return null;
+  try {
+    const creds = JSON.parse(readFileSync(credPath, "utf8"));
+    if (!creds || typeof creds !== "object") return null;
+    return creds;
+  } catch {
+    return null;
+  }
+}
+
+// Env Strix untuk satu provider tersimpan: STRIX_LLM + base + key.
+export function buildStrixEnv({ type, model, baseUrl, apiKey }) {
+  const t = String(type ?? "openai").toLowerCase() === "anthropic" ? "anthropic" : "openai";
+  return {
     STRIX_LLM: `${t}/${model}`,
     LLM_API_BASE: baseUrl,
     LLM_API_KEY: apiKey,
   };
+}
+
+const STRIX_LLM_KEYS = ["STRIX_LLM", "LLM_API_BASE", "LLM_API_KEY"];
+
+// Baca blok env dari cli-config.json apa pun bentuknya: {"env": {...}}
+// (bentuk yang dibaca loader Strix saat ini) atau flat {STRIX_LLM, ...}
+// (bentuk yang ditulis wrapper lama — dimigrasi, bukan dibuang).
+function readStrixEnvBlock(path) {
+  if (!existsSync(path)) return {};
+  let data;
+  try {
+    data = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return {};
+  }
+  if (!data || typeof data !== "object") return {};
+  if (data.env && typeof data.env === "object") return { ...data.env };
+  const flat = {};
+  for (const key of STRIX_LLM_KEYS) {
+    if (typeof data[key] === "string") flat[key] = data[key];
+  }
+  return flat;
+}
+
+export function writeStrixConfig(model, baseUrl, apiKey, type = "openai") {
+  const dir = join(homedir(), ".strix");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
   const path = join(dir, "cli-config.json");
-  atomicWrite(path, JSON.stringify(config, null, 2) + "\n");
+  // Bentuk {"env": {...}} — loader Strix saat ini (strix/config/loader.py:
+  // _read_env_block) HANYA membaca blok env; file flat {STRIX_LLM, ...}
+  // yang ditulis wrapper lama DIABAIKAN (itu sebabnya Strix bilang
+  // "STRIX_LLM is not set" meski file ada). Kunci lain yang sudah ada
+  // di file dipertahankan (mis. STRIX_WEB_SEARCH_PROVIDER yang valid).
+  const env = { ...readStrixEnvBlock(path), ...buildStrixEnv({ type, model, baseUrl, apiKey }) };
+  atomicWrite(path, JSON.stringify({ env }, null, 2) + "\n");
   return path;
 }
 
-export default { detectModels, saveProvider, loadProviders, writeStrixConfig, NINE_ROUTER_BASE, NINE_ROUTER_DOCKER_BASE };
+// Tulis ulang cli-config.json hanya bila triple LLM di file belum sama
+// dengan provider tersimpan. Kembalikan { changed, path }.
+export function syncStrixConfig(model, baseUrl, apiKey, type = "openai") {
+  const dir = join(homedir(), ".strix");
+  const path = join(dir, "cli-config.json");
+  const desired = buildStrixEnv({ type, model, baseUrl, apiKey });
+  const current = readStrixEnvBlock(path);
+  const same = STRIX_LLM_KEYS.every((key) => current[key] === desired[key]);
+  if (same) return { changed: false, path };
+  writeStrixConfig(model, baseUrl, apiKey, type);
+  return { changed: true, path };
+}
+
+export default { detectModels, saveProvider, loadProviders, loadProviderCreds, buildStrixEnv, writeStrixConfig, syncStrixConfig, NINE_ROUTER_BASE, NINE_ROUTER_DOCKER_BASE };

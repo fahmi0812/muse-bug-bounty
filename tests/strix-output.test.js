@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync, execSync } from "node:child_process";
-import { mkdtempSync, writeFileSync, mkdirSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, writeFileSync, mkdirSync, existsSync, rmSync, readFileSync, copyFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { parseStrixOutput, parseCost, classifyVuln, readStrixArtifacts } from "../bounty/lib/strix-output.js";
+import { saveProvider } from "../bounty/lib/provider.js";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const CLI = resolve(ROOT, "bounty/bin/bounty.mjs");
@@ -119,6 +120,55 @@ exit 1
   const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/", "--program", "programs/example.md"], { cwd: ROOT, env, encoding: "utf8" });
   assert.equal(r.status, 2, r.stderr + r.stdout);
   assert.match(r.stderr + r.stdout, /Strix gagal jalan/);
+  assert.doesNotMatch(r.stdout, /Ringkasan run/);
+});
+
+test("run nyata: provider tersimpan diteruskan ke Strix via env + config ditulis bentuk env", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-provider-env-"));
+  // Kasus nyata 24 Nov 2026: Strix bilang "STRIX_LLM is not set" meski
+  // `bounty provider` sudah jalan — karena file config ditulis flat dan
+  // loader Strix hanya membaca blok {"env": ...}.
+  mkdirSync(join(dir, "programs"), { recursive: true });
+  copyFileSync(join(ROOT, "programs", "example.md"), join(dir, "programs", "example.md"));
+  saveProvider({
+    name: "openai", type: "openai", baseUrl: "http://127.0.0.1:20128/v1",
+    apiKey: "test-key-123", model: "kr/claude-opus-4.8-thinking-agentic",
+    dir: join(dir, ".bounty", "providers"),
+  });
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+echo "LLM=$STRIX_LLM"
+echo "BASE=$LLM_API_BASE"
+cat <<'EOF'
+[{"endpoint":"/api/users?id=1","method":"GET","param":"id","vuln_class":"SQL Injection","cwe":"CWE-89"}]
+EOF
+echo 'Total cost: $0.42'
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/users", "--program", "programs/example.md"], { cwd: dir, env, encoding: "utf8" });
+  assert.equal(r.status, 0, r.stderr + r.stdout);
+  assert.match(r.stdout, /LLM=openai\/kr\/claude-opus-4\.8-thinking-agentic/);
+  assert.match(r.stdout, /BASE=http:\/\/127\.0\.0\.1:20128\/v1/);
+  assert.match(r.stdout, /1 kandidat baru masuk store/);
+  // File config ikut diperbaiki ke bentuk env (self-heal).
+  const cfg = JSON.parse(readFileSync(join(dir, ".strix", "cli-config.json"), "utf8"));
+  assert.equal(cfg.env.STRIX_LLM, "openai/kr/claude-opus-4.8-thinking-agentic");
+  assert.equal(cfg.env.LLM_API_KEY, "test-key-123");
+});
+
+test("run nyata: Strix tanpa provider (MISSING REQUIRED) dilaporkan sebagai error + petunjuk bounty provider", () => {
+  const dir = mkdtempSync(join(tmpdir(), "bounty-no-provider-"));
+  writeFileSync(join(dir, "strix"), `#!/bin/sh
+echo "MISSING REQUIRED ENVIRONMENT VARIABLES" >&2
+echo "STRIX_LLM is not set" >&2
+exit 1
+`, { mode: 0o755 });
+  const db = join(dir, "bounty.db");
+  const env = { ...process.env, PATH: `${dir}:${process.env.PATH}`, BOUNTY_DB: db, HOME: dir };
+  const r = spawnSync(process.execPath, [CLI, "run", "--target", "https://example.com/api/", "--program", "programs/example.md"], { cwd: ROOT, env, encoding: "utf8" });
+  assert.equal(r.status, 2, r.stderr + r.stdout);
+  assert.match(r.stderr + r.stdout, /Strix gagal jalan/);
+  assert.match(r.stderr + r.stdout, /bounty provider/);
   assert.doesNotMatch(r.stdout, /Ringkasan run/);
 });
 

@@ -15,7 +15,7 @@ import { scanText, redact } from "../lib/secrets.js";
 import { buildReviewHtml } from "../lib/review-html.js";
 import { TokenBucket } from "../lib/rate.js";
 import { getRoleProfile, buildInstruction } from "../lib/auth.js";
-import { detectModels, saveProvider, writeStrixConfig, loadProviders, NINE_ROUTER_BASE } from "../lib/provider.js";
+import { detectModels, saveProvider, writeStrixConfig, loadProviders, loadProviderCreds, syncStrixConfig, buildStrixEnv, NINE_ROUTER_BASE } from "../lib/provider.js";
 import { runBench, scoreFindings } from "../lib/bench.js";
 import { parseStrixOutput, readStrixArtifacts } from "../lib/strix-output.js";
 import { dedupCandidates, canonicalKey } from "../lib/dedup.js";
@@ -62,7 +62,7 @@ process.on("warning", (w) => {
   process.stderr.write(`${w?.stack || w?.message || w}\n`);
 });
 
-export const VERSION = "1.13.5";
+export const VERSION = "1.13.6";
 const DEFAULT_BUDGET_USD = 5;
 const DEFAULT_MAX_TURNS = 500;
 // Root repo (skills/ + allowRoots guard): bounty/bin/ -> ../../
@@ -635,6 +635,22 @@ async function runSingleTarget(args, targetOverride = null) {
     return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
   }
 
+  // 3c. Provider tersimpan -> teruskan ke Strix via env (env menang atas
+  // file) + perbaiki file config bila bentuknya masih flat/lama. Tanpa
+  // ini Strix bilang "STRIX_LLM is not set" meski `bounty provider`
+  // sudah jalan — karena file flat tidak dibaca loader Strix. Provider
+  // tersimpan di .bounty/providers (cwd) adalah sumber yang dipakai;
+  // STRIX_LLM dari shell (bila ada) ditimpa olehnya di run ini.
+  let providerEnv = {};
+  try {
+    const creds = loadProviderCreds();
+    if (creds?.model && creds?.apiKey) {
+      providerEnv = buildStrixEnv(creds);
+      const synced = syncStrixConfig(creds.model, creds.baseUrl, creds.apiKey, creds.type);
+      if (synced.changed) console.log(`Config Strix diperbaiki: model ditulis ke ${synced.path} (bentuk env).`);
+    }
+  } catch {}
+
   // 4. Pre-exec guard + rate limiter
   // Rate limiter: TokenBucket menegakkan rate request WRAPPER (pre/post
   // run). Request internal Strix TIDAK lewat bucket ini — Strix dibatasi
@@ -678,7 +694,7 @@ async function runSingleTarget(args, targetOverride = null) {
   const res = spawnSync(strix, [...strixArgs, "--instruction", instruction], {
     encoding: "utf8",
     // Privasi tim: telemetri Strix dimatikan (default Strix = 1).
-    env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), STRIX_TELEMETRY: "0" },
+    env: { ...process.env, ...(skillsDir ? { STRIX_SKILLS_DIR: skillsDir } : {}), ...providerEnv, STRIX_TELEMETRY: "0" },
   });
   if (res.error) { console.error(`Gagal menjalankan strix: ${res.error.message}`); return { code: done(2, "error"), usd: 0, added: 0, findings: [] }; }
   mark.strix = Date.now();
@@ -712,7 +728,11 @@ async function runSingleTarget(args, targetOverride = null) {
   const crashed = (code !== 0 && code !== 2) || /Traceback \(most recent call last\)|validation error for \w+Settings|Failed to execute script/i.test(combinedOut);
   if (crashed) {
     console.error(`\nStrix gagal jalan (exit ${code}).`);
-    console.error("Lihat traceback di atas — bila menyebut ValidationError / cli-config.json, perbaiki config Strix lalu ulangi run.");
+    if (/MISSING REQUIRED ENVIRONMENT VARIABLES/i.test(combinedOut)) {
+      console.error("Strix butuh model/provider (STRIX_LLM belum disetel): jalankan `bounty provider` untuk menyimpan provider, lalu ulangi run.");
+    } else {
+      console.error("Lihat traceback di atas — bila menyebut ValidationError / cli-config.json, perbaiki config Strix lalu ulangi run.");
+    }
     return { code: done(2, "error"), usd: 0, added: 0, findings: [] };
   }
   const strixOk = code === 0 || code === 2;

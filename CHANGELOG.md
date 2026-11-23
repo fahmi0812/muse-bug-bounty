@@ -2,6 +2,12 @@
 
 Format: tiap rilis = daftar fitur + batasan. Tanggal WIB.
 
+## [1.13.6] — 2026-11-24
+
+### Fixed
+- **`bounty run` — Strix tidak lagi bilang "STRIX_LLM is not set" meski provider sudah disimpan.** Akar: `writeStrixConfig` menulis `~/.strix/cli-config.json` dalam bentuk flat `{STRIX_LLM, LLM_API_BASE, LLM_API_KEY}`, sementara loader Strix saat ini (`strix/config/loader.py`: `_read_env_block`) HANYA membaca blok `{"env": {...}}` — file flat diabaikan begitu saja. Kemungkinan file flat itu juga pernah ditimpa ulang oleh `persist_current` Strix menjadi `{"env": {}}` sehingga kunci LLM hilang. Perbaikan dua lapis: (1) `writeStrixConfig` kini menulis bentuk `{"env": {...}}` dan menggabungkan kunci lama yang ada (file flat lama dimigrasi, kunci lain seperti `STRIX_WEB_SEARCH_PROVIDER` yang valid dipertahankan); (2) `bounty run` meneruskan provider tersimpan (`.bounty/providers/credentials.json`) ke Strix lewat env saat spawn (env menang atas file) dan memperbaiki file config bila bentuknya masih lama (self-heal, hanya bila berubah).
+- **Pesan crash lebih spesifik:** bila Strix gagal karena `MISSING REQUIRED ENVIRONMENT VARIABLES`, wrapper kini langsung menyarankan `bounty provider` (bukan pesan ValidationError generik).
+
 ## [1.13.5] — 2026-11-24
 
 ### Fixed
